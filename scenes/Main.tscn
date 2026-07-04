@@ -63,7 +63,6 @@ nGravityRadius = 150.0
 [node name="Planet3" parent="Planets" instance=ExtResource( 7 )]
 position = Vector2( 1260, 625 )
 nPlanetRadius = 11.3333
-nCollisionRadius = 11.3333
 nGravityRadius = 110.0
 
 [node name="Planet4" parent="Planets" instance=ExtResource( 7 )]

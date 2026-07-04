@@ -86,7 +86,7 @@ func _process(delta: float) -> void:
 
     match nState:
         GuardState.ORBIT:
-            position = _GetOrbitPosition()
+            _OrbitPatrol(delta)
         GuardState.AGGRO:
             _ProcessAggro(delta)
 
@@ -96,10 +96,28 @@ func _GetOrbitPosition() -> Vector2:
     var vDir = Vector2(cos(nOrbitAngle + nOrbitSlotOffset * 0.18), sin(nOrbitAngle + nOrbitSlotOffset * 0.18))
     return vDir * nOrbitRadius
 
+func _GetOrbitGlobalPosition() -> Vector2:
+    return pBase.to_global(_GetOrbitPosition())
+
+func _OrbitPatrol(delta: float, nSpeedScale: float = 1.0) -> void:
+    _MoveTowards(_GetOrbitGlobalPosition(), delta, nMoveSpeed * nSpeedScale)
+
+func _MoveTowards(vTarget: Vector2, delta: float, nSpeed: float) -> void:
+    var vToTarget = vTarget - global_position
+    var nDist = vToTarget.length()
+    if nDist <= 0.001:
+        return
+    var nStep = nSpeed * delta
+    if nStep >= nDist:
+        global_position = vTarget
+    else:
+        global_position += vToTarget.normalized() * nStep
+    _FaceTarget(vToTarget)
+
 func _ProcessAggro(delta: float) -> void:
     var pTarget = pGame.GetTargetForMonster(self)
     if pTarget == null or not is_instance_valid(pTarget):
-        position = _GetOrbitPosition()
+        _OrbitPatrol(delta)
         return
 
     var vTargetPos = pTarget.global_position if pTarget is Node2D else global_position
@@ -112,8 +130,7 @@ func _ProcessAggro(delta: float) -> void:
         if nAttackCooldown <= 0.0:
             nAttackCooldown = nAttackInterval
             _FireMissile(pTarget, vToTarget)
-        if nDist > nAttackRange * 0.55:
-            global_position += vToTarget.normalized() * nMoveSpeed * delta * 0.35
+        _OrbitPatrol(delta, 0.3)
         return
 
     global_position += vToTarget.normalized() * nMoveSpeed * delta
