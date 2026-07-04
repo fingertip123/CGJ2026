@@ -4,20 +4,22 @@ signal Attached(pPlanet, vLocalOffset, vWorldPos)
 signal Missed
 
 export(float) var nSpeed = 520.0
-export(float) var nMaxRange = 1400.0
+export(float) var nMaxChainLength = 480.0
 export(float) var nHitPadding = 4.0
 
 var vVelocity = Vector2.ZERO
-var nTraveled = 0.0
 var bAttached = false
 var pPlanet = null
 var vLocalOffset = Vector2.ZERO
 var pPlanetsRoot = null
+var pShip = null
 
-func Setup(vDirection: Vector2, pPlanetsRootNode) -> void:
+func Setup(vDirection: Vector2, pPlanetsRootNode, pShipNode, nChainLengthLimit: float = -1.0) -> void:
     pPlanetsRoot = pPlanetsRootNode
+    pShip = pShipNode
+    if nChainLengthLimit > 0.0:
+        nMaxChainLength = nChainLengthLimit
     vVelocity = vDirection.normalized() * nSpeed if vDirection.length_squared() > 0.001 else Vector2.RIGHT * nSpeed
-    nTraveled = 0.0
     bAttached = false
     pPlanet = null
     update()
@@ -38,13 +40,18 @@ func _process(delta: float) -> void:
         return
 
     var vMotion = vVelocity * delta
-    nTraveled += vMotion.length()
-    if nTraveled >= nMaxRange:
+    global_position += vMotion
+
+    if pShip == null or not is_instance_valid(pShip):
         emit_signal("Missed")
         queue_free()
         return
 
-    global_position += vMotion
+    if pShip.global_position.distance_to(global_position) >= nMaxChainLength:
+        emit_signal("Missed")
+        queue_free()
+        return
+
     _TryAttachToPlanet()
     update()
 

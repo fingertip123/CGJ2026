@@ -43,6 +43,7 @@ export(float) var nRefreshCooldownMax = 6.0
 export(float) var nMinLaunchSpeed = 20.0
 export(float) var nMaxLaunchSpeed = 260.0
 export(int) var nMissileSfxPoolSize = 8
+export(float) var nGrappleMaxChainLength = 480.0
 
 var nPhase = GamePhase.PREP
 var nGold = 60
@@ -658,7 +659,7 @@ func _FireGrapple(vMouseWorld: Vector2) -> void:
     pGrapple.connect("Attached", self, "_OnGrappleAttached")
     pGrapple.connect("Missed", self, "_OnGrappleMissed")
     pGrapple.global_position = pShip.global_position + vDir.normalized() * 18.0
-    pGrapple.Setup(vDir, pPlanetsRoot)
+    pGrapple.Setup(vDir, pPlanetsRoot, pShip, nGrappleMaxChainLength)
     pActiveGrapple = pGrapple
 
 func _OnGrappleAttached(pPlanet, vLocalOffset, vWorldPos) -> void:
