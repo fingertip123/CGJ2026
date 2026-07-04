@@ -4,6 +4,7 @@ extends Node2D
 const UnitData = preload("res://scripts/unit_data.gd")
 
 export(float) var nPlanetRadius = 14.0 setget SetPlanetRadius
+export(float) var nCollisionRadius = 14.0 setget SetCollisionRadius
 export(float) var nGravityRadius = 120.0 setget SetGravityRadius
 export(float) var nPlanetMass = 360000.0
 export(float) var nMinGravityDistance = 12.0
@@ -26,10 +27,11 @@ var bDepositsInitialized = false
 var pGravityRipples = null
 
 onready var pSprite = $Sprite
-onready var pCollisionShape = $StaticBody2D/CollisionShape2D
+
+func _enter_tree() -> void:
+    call_deferred("_SyncCollisionShape")
 
 func _ready() -> void:
-    _SyncCollisionShape()
     pGravityRipples = get_node_or_null("GravityRipples")
     _ApplySprite()
     if Engine.editor_hint and not bDepositsInitialized:
@@ -109,22 +111,28 @@ func SetGravityRadius(nValue: float) -> void:
 func SetPlanetRadius(nValue: float) -> void:
     nPlanetRadius = max(1.0, nValue)
     _ApplySprite()
-    _SyncCollisionShape()
     if pGravityRipples != null:
         pGravityRipples.SyncFromPlanet()
     update()
 
+func SetCollisionRadius(nValue: float) -> void:
+    nCollisionRadius = max(1.0, nValue)
+    _SyncCollisionShape()
+    update()
+
+func GetCollisionRadius() -> float:
+    return nCollisionRadius
+
 func GetPlanetRadius() -> float:
-    return nPlanetRadius
+    return nCollisionRadius
 
 func _SyncCollisionShape() -> void:
-    if pCollisionShape == null:
+    var pShapeNode = get_node_or_null("StaticBody2D/CollisionShape2D")
+    if pShapeNode == null:
         return
-    var pShape = pCollisionShape.shape
-    if pShape == null or not (pShape is CircleShape2D):
-        pShape = CircleShape2D.new()
-        pCollisionShape.shape = pShape
-    pShape.radius = nPlanetRadius
+    var pShape = CircleShape2D.new()
+    pShape.radius = nCollisionRadius
+    pShapeNode.shape = pShape
 
 func SetHasDefenseTower(bValue: bool) -> void:
     bHasDefenseTower = bValue
@@ -154,7 +162,7 @@ func GetGravityAcceleration(vWorldPos: Vector2) -> Vector2:
     if nDistSq >= nMaxDistSq or nDistSq <= 0.001:
         return Vector2.ZERO
 
-    var nMinDist = max(nPlanetRadius, nMinGravityDistance)
+    var nMinDist = max(nCollisionRadius, nMinGravityDistance)
     var nSafeDistSq = max(nDistSq, nMinDist * nMinDist)
     var nAccel = nPlanetMass / nSafeDistSq
     return vToPlanet.normalized() * nAccel
