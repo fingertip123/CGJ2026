@@ -2,6 +2,8 @@ extends Node2D
 
 const UnitData = preload("res://scripts/unit_data.gd")
 
+enum MissileKind { DRONE, ENEMY, SHIP_PULSE }
+
 export(float) var nSpeed = 360.0
 export(float) var nHitRadius = 12.0
 export(float) var nMaxLifetime = 4.0
@@ -10,18 +12,23 @@ var nDamage = 10.0
 var nLifetime = 0.0
 var vVelocity = Vector2.ZERO
 var pTarget = null
-var bIsEnemy = false
+var nKind = MissileKind.DRONE
 
 onready var pSprite = $Sprite
 
-func Setup(vDirection: Vector2, nDamageAmount: float, pTargetNode, nSpeedOverride: float = -1.0, bEnemyMissile: bool = false) -> void:
+func Setup(vDirection: Vector2, nDamageAmount: float, pTargetNode, nSpeedOverride: float = -1.0, nMissileKind: int = MissileKind.DRONE) -> void:
     nDamage = nDamageAmount
     pTarget = pTargetNode
-    bIsEnemy = bEnemyMissile
+    nKind = nMissileKind
     if nSpeedOverride > 0.0:
         nSpeed = nSpeedOverride
-    if bIsEnemy:
-        nHitRadius = 10.0
+    match nKind:
+        MissileKind.ENEMY:
+            nHitRadius = 10.0
+        MissileKind.SHIP_PULSE:
+            nHitRadius = 14.0
+        _:
+            nHitRadius = 12.0
     vVelocity = vDirection.normalized() * nSpeed if vDirection.length_squared() > 0.001 else Vector2.UP * nSpeed
     _ApplySprite()
     _UpdateHeading()
@@ -29,14 +36,19 @@ func Setup(vDirection: Vector2, nDamageAmount: float, pTargetNode, nSpeedOverrid
 func _ApplySprite() -> void:
     if pSprite == null:
         return
-    if bIsEnemy:
-        pSprite.texture = UnitData.GetEnemyMissileTexture()
-        var nEnemyScale = UnitData.GetEnemyMissileTextureScale()
-        pSprite.scale = Vector2(nEnemyScale, nEnemyScale)
-    else:
-        pSprite.texture = UnitData.GetMissileTexture()
-        var nScale = UnitData.GetMissileTextureScale()
-        pSprite.scale = Vector2(nScale, nScale)
+    match nKind:
+        MissileKind.ENEMY:
+            pSprite.texture = UnitData.GetEnemyMissileTexture()
+            var nEnemyScale = UnitData.GetEnemyMissileTextureScale()
+            pSprite.scale = Vector2(nEnemyScale, nEnemyScale)
+        MissileKind.SHIP_PULSE:
+            pSprite.texture = UnitData.GetShipPulseTexture()
+            var nPulseScale = UnitData.GetShipPulseTextureScale()
+            pSprite.scale = Vector2(nPulseScale, nPulseScale)
+        _:
+            pSprite.texture = UnitData.GetMissileTexture()
+            var nScale = UnitData.GetMissileTextureScale()
+            pSprite.scale = Vector2(nScale, nScale)
 
 func _UpdateHeading() -> void:
     if pSprite == null or vVelocity.length_squared() <= 0.001:
@@ -45,6 +57,8 @@ func _UpdateHeading() -> void:
 
 func _IsTargetValid() -> bool:
     if pTarget == null or not is_instance_valid(pTarget):
+        return false
+    if not pTarget.has_method("TakeDamage"):
         return false
     if "bActive" in pTarget:
         return pTarget.bActive

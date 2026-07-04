@@ -65,6 +65,9 @@ func _process(delta: float) -> void:
         if nAttackCooldown <= 0.0:
             nAttackCooldown = nAttackInterval
             _FireMissile(pTarget, vToTarget)
+        if nDist > nAttackRange * 0.55:
+            global_position += vToTarget.normalized() * nMoveSpeed * delta * 0.35
+        update()
         return
 
     global_position += vToTarget.normalized() * nMoveSpeed * delta
@@ -76,9 +79,14 @@ func _FaceTarget(vToTarget: Vector2) -> void:
     pSprite.rotation = vToTarget.angle() + PI * 0.5
 
 func _FireMissile(pTarget, vToTarget: Vector2) -> void:
-    if pGame == null or vToTarget.length_squared() <= 0.001:
+    if pGame == null:
         return
-    var vDir = vToTarget.normalized()
+    var vDir = vToTarget
+    if vDir.length_squared() <= 0.001 and pTarget is Node2D:
+        vDir = pTarget.global_position - global_position
+    if vDir.length_squared() <= 0.001:
+        vDir = Vector2.RIGHT
+    vDir = vDir.normalized()
     var vSpawn = global_position + vDir * 12.0
     pGame.SpawnEnemyMissile(vSpawn, vDir, nAttackDamage, pTarget)
     pGame.PlayEnemyMissileLaunchSound(global_position)

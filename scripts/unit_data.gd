@@ -29,6 +29,8 @@ const DRONE_TEXTURE_SCALES = {
 const MINING_TEXTURE = preload("res://images/miningDrone.png")
 const MINING_TEXTURE_SCALE = 0.011
 
+const PLANET_TEXTURE = preload("res://images/planet.png")
+
 const MISSILE_TEXTURE = preload("res://images/Bullet.png")
 const MISSILE_TEXTURE_SCALE = 0.010
 const MISSILE_LAUNCH_SOUND = preload("res://music/bullet.mp3")
@@ -41,6 +43,11 @@ const ENEMY_MISSILE_TEXTURE = preload("res://images/enemy_bullet.png")
 const ENEMY_MISSILE_TEXTURE_SCALE = 0.008
 const ENEMY_MISSILE_LAUNCH_SOUND = preload("res://music/enemy_bullet.mp3")
 const ENEMY_MISSILE_SPEED = 320.0
+
+const SHIP_PULSE_TEXTURE = preload("res://images/pulseBulllet.png")
+const SHIP_PULSE_TEXTURE_SCALE = 0.011
+const SHIP_PULSE_LAUNCH_SOUND = preload("res://music/pulseBullet.mp3")
+const SHIP_PULSE_SPEED = 400.0
 
 const ENEMY_DRONE_STATS = {
     "hp": 45.0,
@@ -128,6 +135,9 @@ static func GetMiningTexture():
 static func GetMiningTextureScale() -> float:
     return MINING_TEXTURE_SCALE
 
+static func GetPlanetTexture():
+    return PLANET_TEXTURE
+
 static func GetMissileTexture():
     return MISSILE_TEXTURE
 
@@ -160,6 +170,18 @@ static func GetEnemyMissileLaunchSound():
 
 static func GetEnemyMissileSpeed() -> float:
     return ENEMY_MISSILE_SPEED
+
+static func GetShipPulseTexture():
+    return SHIP_PULSE_TEXTURE
+
+static func GetShipPulseTextureScale() -> float:
+    return SHIP_PULSE_TEXTURE_SCALE
+
+static func GetShipPulseLaunchSound():
+    return SHIP_PULSE_LAUNCH_SOUND
+
+static func GetShipPulseSpeed() -> float:
+    return SHIP_PULSE_SPEED
 
 static func GetMinEscortAttackRange() -> float:
     var nMinRange = INF

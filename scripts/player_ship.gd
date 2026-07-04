@@ -38,6 +38,7 @@ var bFuelDepletedNotified = false
 var nAttackCooldown = 0.0
 var nFlightTime = 0.0
 var vVelocity = Vector2.ZERO
+var vHeading = Vector2.RIGHT
 var vSpawnPosition = Vector2.ZERO
 var pRoute = null
 var pGame = null
@@ -55,6 +56,7 @@ func Setup(pRouteManager, pGameNode) -> void:
     bFuelDepletedNotified = false
     nFlightTime = 0.0
     vVelocity = Vector2.ZERO
+    vHeading = Vector2.RIGHT
     _UpdateThruster()
     update()
 
@@ -66,6 +68,7 @@ func ResetPathProgress() -> void:
     bFuelDepletedNotified = false
     nFlightTime = 0.0
     vVelocity = Vector2.ZERO
+    vHeading = Vector2.RIGHT
     global_position = vSpawnPosition
     _UpdateThruster()
     update()
@@ -78,6 +81,7 @@ func ResetFlightState() -> void:
     bFuelDepletedNotified = false
     nFlightTime = 0.0
     vVelocity = Vector2.ZERO
+    vHeading = Vector2.RIGHT
     _UpdateThruster()
     update()
 
@@ -188,6 +192,7 @@ func StopMarch() -> void:
     bHasThrust = false
     bBraking = false
     vVelocity = Vector2.ZERO
+    vHeading = Vector2.RIGHT
     _UpdateThruster()
 
 func StartAnchorBrake() -> void:
@@ -203,6 +208,7 @@ func _FinishAnchorBrake() -> void:
     bMoving = false
     bBraking = false
     vVelocity = Vector2.ZERO
+    vHeading = Vector2.RIGHT
     _UpdateThruster()
     emit_signal("AnchorBrakeFinished")
 
@@ -224,9 +230,19 @@ func GetHpRatio() -> float:
     return clamp(nHp / nMaxHp, 0.0, 1.0)
 
 func _UpdateHeading() -> void:
-    if pAircraft == null or vVelocity.length_squared() <= 0.001:
+    if pAircraft == null:
         return
-    pAircraft.rotation = vVelocity.angle() + PI * 0.5
+    if vVelocity.length_squared() > 0.001:
+        vHeading = vVelocity.normalized()
+    pAircraft.rotation = vHeading.angle() + PI * 0.5
+
+func _FirePulseMissile(pTarget) -> void:
+    if pGame == null or pTarget == null:
+        return
+    var vDir = vHeading
+    var vSpawn = global_position + vDir * 32.0
+    pGame.SpawnShipPulseMissile(vSpawn, vDir, nAttackDamage, pTarget)
+    pGame.PlayShipPulseLaunchSound(global_position)
 
 func _UpdateThruster() -> void:
     if pThrusterFlame == null:
@@ -270,7 +286,7 @@ func _process(delta: float) -> void:
             var pTarget = pGame.GetNearestMonsterInRange(global_position, nAttackRange)
             if pTarget != null:
                 nAttackCooldown = nAttackInterval
-                pTarget.TakeDamage(nAttackDamage)
+                _FirePulseMissile(pTarget)
 
     update()
 

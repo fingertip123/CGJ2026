@@ -11,3 +11,5 @@ nDefenseRange = 150.0
 
 [node name="GravityRipples" type="Node2D" parent="."]
 script = ExtResource( 2 )
+
+[node name="Sprite" type="Sprite" parent="."]

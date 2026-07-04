@@ -1,6 +1,8 @@
 tool
 extends Node2D
 
+const UnitData = preload("res://scripts/unit_data.gd")
+
 export(float) var nPlanetRadius = 14.0 setget SetPlanetRadius
 export(float) var nGravityRadius = 120.0 setget SetGravityRadius
 export(float) var nPlanetMass = 360000.0
@@ -23,11 +25,28 @@ var nGoldRemaining = 0
 var bDepositsInitialized = false
 var pGravityRipples = null
 
+onready var pSprite = $Sprite
+
 func _ready() -> void:
     pGravityRipples = get_node_or_null("GravityRipples")
+    _ApplySprite()
     if Engine.editor_hint and not bDepositsInitialized:
         _InitDeposits()
         update()
+
+func _ApplySprite() -> void:
+    if pSprite == null:
+        return
+    var pTexture = UnitData.GetPlanetTexture()
+    if pTexture == null:
+        return
+    pSprite.texture = pTexture
+    var vTexSize = pTexture.get_size()
+    var nMaxTex = max(vTexSize.x, vTexSize.y)
+    if nMaxTex <= 0.001:
+        return
+    var nScale = (nPlanetRadius * 2.0) / nMaxTex
+    pSprite.scale = Vector2(nScale, nScale)
 
 func Setup(pGameNode) -> void:
     pGame = pGameNode
@@ -87,6 +106,7 @@ func SetGravityRadius(nValue: float) -> void:
 
 func SetPlanetRadius(nValue: float) -> void:
     nPlanetRadius = max(1.0, nValue)
+    _ApplySprite()
     if pGravityRipples != null:
         pGravityRipples.SyncFromPlanet()
     update()
@@ -165,10 +185,6 @@ func _draw() -> void:
 
     if bHasDefenseTower:
         draw_arc(Vector2.ZERO, nDefenseRange, 0.0, TAU, 64, Color(1.0, 0.35, 0.25, 0.18), 1.5, true)
-
-    draw_circle(Vector2.ZERO, nPlanetRadius, oPlanetColor.darkened(0.12))
-    draw_circle(Vector2(-nPlanetRadius * 0.18, -nPlanetRadius * 0.18), nPlanetRadius * 0.72, oPlanetColor)
-    draw_arc(Vector2.ZERO, nPlanetRadius + 4.0, 0.15, PI - 0.15, 48, Color(0.85, 0.9, 1.0, 0.3), 2.0, true)
 
     if bHasDefenseTower:
         var vBase = Vector2(0, -nPlanetRadius - 4.0)

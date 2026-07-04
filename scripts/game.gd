@@ -53,6 +53,8 @@ var vMissileSfxPlayers = []
 var nMissileSfxIndex = 0
 var vEnemyMissileSfxPlayers = []
 var nEnemyMissileSfxIndex = 0
+var vShipPulseSfxPlayers = []
+var nShipPulseSfxIndex = 0
 
 func _ready() -> void:
     nGold = nStartGold
@@ -83,6 +85,7 @@ func _ready() -> void:
     pMinimap.Setup(pShip, pAnchorPoint, pPlanetsRoot, pRoute.oEditBounds)
     _SetupMissileSfx()
     _SetupEnemyMissileSfx()
+    _SetupShipPulseSfx()
     _SetupPlanets()
     pSpawnManager.Setup(self, pRoute, pShip)
     _SyncRouteFuelRange()
@@ -229,7 +232,13 @@ func SpawnEnemyMissile(vSpawnPos: Vector2, vDirection: Vector2, nDamage: float, 
     var pMissile = MissileScene.instance()
     pMissileRoot.add_child(pMissile)
     pMissile.global_position = vSpawnPos
-    pMissile.Setup(vDirection, nDamage, pTarget, UnitData.GetEnemyMissileSpeed(), true)
+    pMissile.Setup(vDirection, nDamage, pTarget, UnitData.GetEnemyMissileSpeed(), pMissile.MissileKind.ENEMY)
+
+func SpawnShipPulseMissile(vSpawnPos: Vector2, vDirection: Vector2, nDamage: float, pTarget) -> void:
+    var pMissile = MissileScene.instance()
+    pMissileRoot.add_child(pMissile)
+    pMissile.global_position = vSpawnPos
+    pMissile.Setup(vDirection, nDamage, pTarget, UnitData.GetShipPulseSpeed(), pMissile.MissileKind.SHIP_PULSE)
 
 func PlayMissileLaunchSound(vWorldPos: Vector2) -> void:
     if vMissileSfxPlayers.empty():
@@ -243,6 +252,14 @@ func PlayEnemyMissileLaunchSound(vWorldPos: Vector2) -> void:
     if vEnemyMissileSfxPlayers.empty():
         return
     var pPlayer = _GetEnemyMissileSfxPlayer()
+    pPlayer.global_position = vWorldPos
+    pPlayer.stop()
+    pPlayer.play()
+
+func PlayShipPulseLaunchSound(vWorldPos: Vector2) -> void:
+    if vShipPulseSfxPlayers.empty():
+        return
+    var pPlayer = _GetShipPulseSfxPlayer()
     pPlayer.global_position = vWorldPos
     pPlayer.stop()
     pPlayer.play()
@@ -269,6 +286,17 @@ func _GetEnemyMissileSfxPlayer() -> AudioStreamPlayer2D:
     nEnemyMissileSfxIndex = (nEnemyMissileSfxIndex + 1) % vEnemyMissileSfxPlayers.size()
     return pFallback
 
+func _GetShipPulseSfxPlayer() -> AudioStreamPlayer2D:
+    for i in range(vShipPulseSfxPlayers.size()):
+        var nIndex = (nShipPulseSfxIndex + i) % vShipPulseSfxPlayers.size()
+        var pPlayer = vShipPulseSfxPlayers[nIndex]
+        if not pPlayer.playing:
+            nShipPulseSfxIndex = (nIndex + 1) % vShipPulseSfxPlayers.size()
+            return pPlayer
+    var pFallback = vShipPulseSfxPlayers[nShipPulseSfxIndex]
+    nShipPulseSfxIndex = (nShipPulseSfxIndex + 1) % vShipPulseSfxPlayers.size()
+    return pFallback
+
 func _SetupMissileSfx() -> void:
     vMissileSfxPlayers.clear()
     for i in range(max(1, nMissileSfxPoolSize)):
@@ -292,6 +320,18 @@ func _SetupEnemyMissileSfx() -> void:
             pStream.loop = false
             pPlayer.stream = pStream
         vEnemyMissileSfxPlayers.append(pPlayer)
+
+func _SetupShipPulseSfx() -> void:
+    vShipPulseSfxPlayers.clear()
+    for i in range(max(1, nMissileSfxPoolSize)):
+        var pPlayer = AudioStreamPlayer2D.new()
+        pSfxRoot.add_child(pPlayer)
+        var pStream = UnitData.GetShipPulseLaunchSound()
+        if pStream != null:
+            pStream = pStream.duplicate()
+            pStream.loop = false
+            pPlayer.stream = pStream
+        vShipPulseSfxPlayers.append(pPlayer)
 
 func _SetupPlanets() -> void:
     for pPlanet in pPlanetsRoot.get_children():
