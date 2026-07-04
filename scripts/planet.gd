@@ -21,8 +21,10 @@ var nDefenseCooldown = 0.0
 var nFuelRemaining = 0
 var nGoldRemaining = 0
 var bDepositsInitialized = false
+var pGravityRipples = null
 
 func _ready() -> void:
+    pGravityRipples = get_node_or_null("GravityRipples")
     if Engine.editor_hint and not bDepositsInitialized:
         _InitDeposits()
         update()
@@ -77,12 +79,16 @@ func GetDepositRatio() -> float:
     var nLeft = nFuelRemaining + nGoldRemaining
     return clamp(float(nLeft) / float(nTotal), 0.0, 1.0)
 
-func SetPlanetRadius(nValue: float) -> void:
-    nPlanetRadius = max(1.0, nValue)
-    update()
-
 func SetGravityRadius(nValue: float) -> void:
     nGravityRadius = max(nPlanetRadius, nValue)
+    if pGravityRipples != null:
+        pGravityRipples.SyncFromPlanet()
+    update()
+
+func SetPlanetRadius(nValue: float) -> void:
+    nPlanetRadius = max(1.0, nValue)
+    if pGravityRipples != null:
+        pGravityRipples.SyncFromPlanet()
     update()
 
 func SetHasDefenseTower(bValue: bool) -> void:
@@ -99,6 +105,8 @@ func SetPlanetColor(oValue: Color) -> void:
 
 func SetGravityColor(oValue: Color) -> void:
     oGravityColor = oValue
+    if pGravityRipples != null:
+        pGravityRipples.SyncFromPlanet()
     update()
 
 func IsInsideGravity(vWorldPos: Vector2) -> bool:
@@ -121,6 +129,9 @@ func GetCircularOrbitSpeed(nOrbitRadius: float) -> float:
     return sqrt(nPlanetMass / nRadius)
 
 func _process(delta: float) -> void:
+    if pGravityRipples != null and pGravityRipples.Tick(delta):
+        update()
+
     if Engine.editor_hint:
         return
     if not bHasDefenseTower:
@@ -148,6 +159,9 @@ func TryAttack(pTarget) -> bool:
 func _draw() -> void:
     draw_circle(Vector2.ZERO, nGravityRadius, oGravityColor)
     draw_arc(Vector2.ZERO, nGravityRadius, 0.0, TAU, 72, Color(oGravityColor.r, oGravityColor.g, oGravityColor.b, 0.35), 2.0, true)
+
+    if pGravityRipples != null:
+        pGravityRipples.DrawRipples(self)
 
     if bHasDefenseTower:
         draw_arc(Vector2.ZERO, nDefenseRange, 0.0, TAU, 64, Color(1.0, 0.35, 0.25, 0.18), 1.5, true)
