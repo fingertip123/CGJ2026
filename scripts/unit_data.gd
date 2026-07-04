@@ -54,14 +54,14 @@ const ENEMY_DRONE_STATS = {
     "hp": 45.0,
     "damage": 8.0,
     "interval": 0.8,
-    "move_speed": 85.0,
+    "move_speed": 140.0,
 }
 
 const ENEMY_BASE_GUARD_STATS = {
     "hp": 72.0,
     "damage": 12.0,
     "interval": 0.65,
-    "move_speed": 95.0,
+    "move_speed": 190.0,
 }
 
 const ENEMY_BASE_TEXTURE = preload("res://images/enemyBase.png")
@@ -70,9 +70,9 @@ const MAP_SCALE = 6.0
 const MAP_BASE_SIZE = Vector2(1600, 790)
 
 const ENEMY_BASE_STATS = {
-    "body_radius": 52.0,
-    "guard_count": 28,
-    "guard_orbit_radius": 165.0,
+    "body_radius": 104.0,
+    "guard_count": 56,
+    "guard_orbit_radius": 330.0,
     "guard_orbit_speed": 1.35,
     "alert_radius": 520.0,
     "patrol_radius": 110.0,
@@ -138,9 +138,9 @@ const MINING_STATS = {
 
 const SHIP_LEVELS = [
     {"card_slots": 2, "drone_max": 4, "mining_max": 2, "hp": 500.0, "attack": 8.0, "attack_range": 72.0, "attack_interval": 0.55, "radius": 120.0, "escort_detect_radius": 145.0, "scale": 1.0, "upgrade_cost": 80},
-    {"card_slots": 3, "drone_max": 12, "mining_max": 6, "hp": 650.0, "attack": 11.0, "attack_range": 82.0, "attack_interval": 0.47, "radius": 138.0, "escort_detect_radius": 178.0, "scale": 1.1, "upgrade_cost": 150},
-    {"card_slots": 4, "drone_max": 16, "mining_max": 8, "hp": 820.0, "attack": 14.0, "attack_range": 92.0, "attack_interval": 0.40, "radius": 156.0, "escort_detect_radius": 215.0, "scale": 1.2, "upgrade_cost": 250},
-    {"card_slots": 5, "drone_max": 20, "mining_max": 10, "hp": 1000.0, "attack": 18.0, "attack_range": 102.0, "attack_interval": 0.34, "radius": 174.0, "escort_detect_radius": 255.0, "scale": 1.3, "upgrade_cost": -1},
+    {"card_slots": 3, "drone_max": 20, "mining_max": 12, "hp": 650.0, "attack": 11.0, "attack_range": 82.0, "attack_interval": 0.47, "radius": 276.0, "escort_detect_radius": 356.0, "scale": 1.1, "upgrade_cost": 150},
+    {"card_slots": 4, "drone_max": 30, "mining_max": 16, "hp": 820.0, "attack": 14.0, "attack_range": 92.0, "attack_interval": 0.40, "radius": 312.0, "escort_detect_radius": 430.0, "scale": 1.2, "upgrade_cost": 250},
+    {"card_slots": 5, "drone_max": 40, "mining_max": 10, "hp": 1000.0, "attack": 18.0, "attack_range": 102.0, "attack_interval": 0.34, "radius": 348.0, "escort_detect_radius": 255.0, "scale": 1.3, "upgrade_cost": -1},
 ]
 
 static func GetDroneStats(nType: int) -> Dictionary:

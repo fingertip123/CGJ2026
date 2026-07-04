@@ -7,7 +7,7 @@ export(float) var nMinSpawnInterval = 0.11
 export(float) var nSpawnAccelDuration = 150.0
 export(float) var nSpawnAccelMinScale = 0.22
 export(float) var nEdgePadding = 64.0
-export(int) var nMaxAlive = 78
+export(int) var nMaxAlive = 117
 export(int) var nSpawnBurstMin = 1
 export(int) var nSpawnBurstMax = 3
 
