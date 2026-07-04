@@ -29,6 +29,26 @@ const DRONE_TEXTURE_SCALES = {
 const MINING_TEXTURE = preload("res://images/miningDrone.png")
 const MINING_TEXTURE_SCALE = 0.011
 
+const MISSILE_TEXTURE = preload("res://images/Bullet.png")
+const MISSILE_TEXTURE_SCALE = 0.010
+const MISSILE_LAUNCH_SOUND = preload("res://music/bullet.mp3")
+const MISSILE_SPEED = 360.0
+
+const ENEMY_DRONE_TEXTURE = preload("res://images/anemy.png")
+const ENEMY_DRONE_TEXTURE_SCALE = 0.013
+
+const ENEMY_MISSILE_TEXTURE = preload("res://images/enemy_bullet.png")
+const ENEMY_MISSILE_TEXTURE_SCALE = 0.008
+const ENEMY_MISSILE_LAUNCH_SOUND = preload("res://music/enemy_bullet.mp3")
+const ENEMY_MISSILE_SPEED = 320.0
+
+const ENEMY_DRONE_STATS = {
+    "hp": 45.0,
+    "damage": 8.0,
+    "interval": 0.8,
+    "move_speed": 85.0,
+}
+
 const DRONE_STATS = {
     DroneType.SHIELD: {
         "hp": 120.0,
@@ -107,6 +127,47 @@ static func GetMiningTexture():
 
 static func GetMiningTextureScale() -> float:
     return MINING_TEXTURE_SCALE
+
+static func GetMissileTexture():
+    return MISSILE_TEXTURE
+
+static func GetMissileTextureScale() -> float:
+    return MISSILE_TEXTURE_SCALE
+
+static func GetMissileLaunchSound():
+    return MISSILE_LAUNCH_SOUND
+
+static func GetMissileSpeed() -> float:
+    return MISSILE_SPEED
+
+static func GetEnemyDroneStats() -> Dictionary:
+    return ENEMY_DRONE_STATS
+
+static func GetEnemyDroneTexture():
+    return ENEMY_DRONE_TEXTURE
+
+static func GetEnemyDroneTextureScale() -> float:
+    return ENEMY_DRONE_TEXTURE_SCALE
+
+static func GetEnemyMissileTexture():
+    return ENEMY_MISSILE_TEXTURE
+
+static func GetEnemyMissileTextureScale() -> float:
+    return ENEMY_MISSILE_TEXTURE_SCALE
+
+static func GetEnemyMissileLaunchSound():
+    return ENEMY_MISSILE_LAUNCH_SOUND
+
+static func GetEnemyMissileSpeed() -> float:
+    return ENEMY_MISSILE_SPEED
+
+static func GetMinEscortAttackRange() -> float:
+    var nMinRange = INF
+    for nType in DRONE_STATS.keys():
+        var nRange = DRONE_STATS[nType].range
+        if nRange < nMinRange:
+            nMinRange = nRange
+    return nMinRange
 
 static func GetMiningStats() -> Dictionary:
     return MINING_STATS

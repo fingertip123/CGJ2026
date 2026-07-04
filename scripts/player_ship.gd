@@ -10,6 +10,7 @@ signal FuelDepleted
 signal AnchorBrakeFinished
 
 onready var pCamera = $Camera2D
+onready var pAircraft = $Aircraft
 
 export(float) var nLaunchSpeed = 85.0
 export(float) var nMaxFlightTime = 40.0
@@ -175,6 +176,7 @@ func StartMarch() -> void:
     bMoving = true
     bHasThrust = true
     bFuelDepletedNotified = false
+    _UpdateHeading()
 
 func StopMarch() -> void:
     bMoving = false
@@ -213,6 +215,11 @@ func TakeDamage(nAmount: float) -> void:
 func GetHpRatio() -> float:
     return clamp(nHp / nMaxHp, 0.0, 1.0)
 
+func _UpdateHeading() -> void:
+    if pAircraft == null or vVelocity.length_squared() <= 0.001:
+        return
+    pAircraft.rotation = vVelocity.angle() + PI * 0.5
+
 func _process(delta: float) -> void:
     if Engine.editor_hint:
         update()
@@ -239,6 +246,7 @@ func _process(delta: float) -> void:
                     emit_signal("FuelDepleted")
         global_position += vVelocity * delta
         nPathT = clamp(nFlightTime / max(nMaxFlightTime, 0.001), 0.0, 1.0)
+        _UpdateHeading()
 
     if pGame != null and pGame.IsMarchRunning():
         nAttackCooldown -= delta

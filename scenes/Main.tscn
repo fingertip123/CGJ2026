@@ -35,6 +35,10 @@ position = Vector2( 1480, 120 )
 
 [node name="MonsterRoot" type="Node2D" parent="."]
 
+[node name="MissileRoot" type="Node2D" parent="."]
+
+[node name="SfxRoot" type="Node2D" parent="."]
+
 [node name="SpawnManager" type="Node2D" parent="."]
 script = ExtResource( 4 )
 

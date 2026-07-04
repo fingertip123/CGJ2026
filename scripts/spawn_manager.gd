@@ -27,7 +27,7 @@ func Reset() -> void:
     nSpawned = 0
 
 func _process(delta: float) -> void:
-    if pGame == null or not pGame.IsMarchRunning():
+    if pGame == null or not pGame.CanDroneAttack():
         return
     if pBase == null or pRoute == null:
         return

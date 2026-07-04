@@ -23,9 +23,12 @@ onready var pSpeedSlider = $UiLayer/Panel/VBox/SpeedSlider
 onready var pBackground = $BackgroundLayer/Background
 onready var pAnchorIndicator = $UiLayer/AnchorIndicator
 onready var pMinimap = $UiLayer/Minimap
+onready var pMissileRoot = $MissileRoot
+onready var pSfxRoot = $SfxRoot
 
 const DroneEscortScene = preload("res://scenes/DroneEscort.tscn")
 const DroneMiningScene = preload("res://scenes/DroneMining.tscn")
+const MissileScene = preload("res://scenes/Missile.tscn")
 const UnitData = preload("res://scripts/unit_data.gd")
 
 export(int) var nStartGold = 60
@@ -34,6 +37,7 @@ export(int) var nRefreshCost = 15
 export(float) var nRefreshCooldownMax = 6.0
 export(float) var nMinLaunchSpeed = 20.0
 export(float) var nMaxLaunchSpeed = 260.0
+export(int) var nMissileSfxPoolSize = 8
 
 var nPhase = GamePhase.PREP
 var nGold = 60
@@ -44,6 +48,10 @@ var vDrones = []
 var vMiningDrones = []
 var vCards = []
 var vParallaxOrigin = Vector2.ZERO
+var vMissileSfxPlayers = []
+var nMissileSfxIndex = 0
+var vEnemyMissileSfxPlayers = []
+var nEnemyMissileSfxIndex = 0
 
 func _ready() -> void:
     nGold = nStartGold
@@ -72,6 +80,8 @@ func _ready() -> void:
     pBackground.SetCameraOffset(Vector2.ZERO)
     pAnchorIndicator.Setup(pAnchorPoint, pShip)
     pMinimap.Setup(pShip, pAnchorPoint, pPlanetsRoot, pRoute.oEditBounds)
+    _SetupMissileSfx()
+    _SetupEnemyMissileSfx()
     _SetupPlanets()
     pSpawnManager.Setup(self, pRoute, pShip)
     _SyncRouteFuelRange()
@@ -96,6 +106,12 @@ func _process(delta: float) -> void:
 
 func IsMarchRunning() -> bool:
     return nPhase == GamePhase.MARCH or nPhase == GamePhase.ANCHOR
+
+func IsEscortActive() -> bool:
+    return nPhase != GamePhase.WIN and nPhase != GamePhase.LOSE
+
+func CanDroneAttack() -> bool:
+    return nPhase == GamePhase.MARCH or nPhase == GamePhase.ANCHOR or nPhase == GamePhase.ANCHOR_PLAN
 
 func IsAnchored() -> bool:
     return nPhase == GamePhase.ANCHOR or nPhase == GamePhase.ANCHOR_PLAN
@@ -170,19 +186,17 @@ func GetNearestMineablePlanet(vFrom: Vector2):
     return pBest
 
 func GetTargetForMonster(pMonster):
-    var pBestTaunt = null
+    var pBestDrone = null
     var nBestDist = INF
     for pDrone in vDrones:
         if pDrone == null or not is_instance_valid(pDrone) or not pDrone.bActive:
             continue
-        if not pDrone.bTaunt:
-            continue
         var nDist = pMonster.global_position.distance_to(pDrone.global_position)
-        if nDist <= pDrone.nTauntRange and nDist < nBestDist:
+        if nDist < nBestDist:
             nBestDist = nDist
-            pBestTaunt = pDrone
-    if pBestTaunt != null:
-        return pBestTaunt
+            pBestDrone = pDrone
+    if pBestDrone != null:
+        return pBestDrone
     return pShip
 
 func OnMiningDroneDelivered(nFuelAmount: float, nGoldAmount: int) -> void:
@@ -200,6 +214,80 @@ func AddMonster(pMonster, vPos: Vector2) -> void:
     pMonster.connect("Died", self, "_OnMonsterDied")
     pMonster.Setup(self)
     vMonsters.append(pMonster)
+
+func SpawnMissile(vSpawnPos: Vector2, vDirection: Vector2, nDamage: float, pTarget) -> void:
+    var pMissile = MissileScene.instance()
+    pMissileRoot.add_child(pMissile)
+    pMissile.global_position = vSpawnPos
+    pMissile.Setup(vDirection, nDamage, pTarget, UnitData.GetMissileSpeed())
+
+func SpawnEnemyMissile(vSpawnPos: Vector2, vDirection: Vector2, nDamage: float, pTarget) -> void:
+    var pMissile = MissileScene.instance()
+    pMissileRoot.add_child(pMissile)
+    pMissile.global_position = vSpawnPos
+    pMissile.Setup(vDirection, nDamage, pTarget, UnitData.GetEnemyMissileSpeed(), true)
+
+func PlayMissileLaunchSound(vWorldPos: Vector2) -> void:
+    if vMissileSfxPlayers.empty():
+        return
+    var pPlayer = _GetMissileSfxPlayer()
+    pPlayer.global_position = vWorldPos
+    pPlayer.stop()
+    pPlayer.play()
+
+func PlayEnemyMissileLaunchSound(vWorldPos: Vector2) -> void:
+    if vEnemyMissileSfxPlayers.empty():
+        return
+    var pPlayer = _GetEnemyMissileSfxPlayer()
+    pPlayer.global_position = vWorldPos
+    pPlayer.stop()
+    pPlayer.play()
+
+func _GetMissileSfxPlayer() -> AudioStreamPlayer2D:
+    for i in range(vMissileSfxPlayers.size()):
+        var nIndex = (nMissileSfxIndex + i) % vMissileSfxPlayers.size()
+        var pPlayer = vMissileSfxPlayers[nIndex]
+        if not pPlayer.playing:
+            nMissileSfxIndex = (nIndex + 1) % vMissileSfxPlayers.size()
+            return pPlayer
+    var pFallback = vMissileSfxPlayers[nMissileSfxIndex]
+    nMissileSfxIndex = (nMissileSfxIndex + 1) % vMissileSfxPlayers.size()
+    return pFallback
+
+func _GetEnemyMissileSfxPlayer() -> AudioStreamPlayer2D:
+    for i in range(vEnemyMissileSfxPlayers.size()):
+        var nIndex = (nEnemyMissileSfxIndex + i) % vEnemyMissileSfxPlayers.size()
+        var pPlayer = vEnemyMissileSfxPlayers[nIndex]
+        if not pPlayer.playing:
+            nEnemyMissileSfxIndex = (nIndex + 1) % vEnemyMissileSfxPlayers.size()
+            return pPlayer
+    var pFallback = vEnemyMissileSfxPlayers[nEnemyMissileSfxIndex]
+    nEnemyMissileSfxIndex = (nEnemyMissileSfxIndex + 1) % vEnemyMissileSfxPlayers.size()
+    return pFallback
+
+func _SetupMissileSfx() -> void:
+    vMissileSfxPlayers.clear()
+    for i in range(max(1, nMissileSfxPoolSize)):
+        var pPlayer = AudioStreamPlayer2D.new()
+        pSfxRoot.add_child(pPlayer)
+        var pStream = UnitData.GetMissileLaunchSound()
+        if pStream != null:
+            pStream = pStream.duplicate()
+            pStream.loop = false
+            pPlayer.stream = pStream
+        vMissileSfxPlayers.append(pPlayer)
+
+func _SetupEnemyMissileSfx() -> void:
+    vEnemyMissileSfxPlayers.clear()
+    for i in range(max(1, nMissileSfxPoolSize)):
+        var pPlayer = AudioStreamPlayer2D.new()
+        pSfxRoot.add_child(pPlayer)
+        var pStream = UnitData.GetEnemyMissileLaunchSound()
+        if pStream != null:
+            pStream = pStream.duplicate()
+            pStream.loop = false
+            pPlayer.stream = pStream
+        vEnemyMissileSfxPlayers.append(pPlayer)
 
 func _SetupPlanets() -> void:
     for pPlanet in pPlanetsRoot.get_children():

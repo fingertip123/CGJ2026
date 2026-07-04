@@ -78,14 +78,16 @@ func _process(delta: float) -> void:
 
     nOrbitAngle += nOrbitSpeed * delta
 
-    if not pGame.IsMarchRunning():
-        global_position = _GetOrbitPosition()
+    if not pGame.IsEscortActive():
         update()
         return
 
-    var pTarget = pGame.GetNearestMonsterInAnchorZone(global_position, pShip.nAnchorRadius)
-    if pTarget != null:
-        _SeekAndAttack(pTarget, delta)
+    if pGame.CanDroneAttack():
+        var pTarget = pGame.GetNearestMonsterInAnchorZone(global_position, pShip.nAnchorRadius)
+        if pTarget != null:
+            _SeekAndAttack(pTarget, delta)
+        else:
+            _OrbitPatrol(delta)
     else:
         _OrbitPatrol(delta)
 
@@ -95,24 +97,49 @@ func _GetOrbitPosition() -> Vector2:
     var vDir = Vector2(cos(nOrbitAngle + nOrbitSlotOffset * 0.15), sin(nOrbitAngle + nOrbitSlotOffset * 0.15))
     return _ClampToAnchorZone(pShip.global_position + vDir * nOrbitRadius)
 
-func _OrbitPatrol(delta: float) -> void:
-    var vTarget = _GetOrbitPosition()
-    global_position = global_position.linear_interpolate(vTarget, min(1.0, delta * 4.0))
+func _OrbitPatrol(delta: float, nSpeedScale: float = 1.0) -> void:
+    _MoveTowards(_GetOrbitPosition(), delta, nMoveSpeed * nSpeedScale)
+
+func _MoveTowards(vTarget: Vector2, delta: float, nSpeed: float) -> void:
+    var vToTarget = vTarget - global_position
+    var nDist = vToTarget.length()
+    if nDist <= 0.001:
+        return
+    var nStep = nSpeed * delta
+    if nStep >= nDist:
+        global_position = vTarget
+    else:
+        global_position += vToTarget.normalized() * nStep
+    _FaceTarget(vToTarget)
 
 func _SeekAndAttack(pTarget, delta: float) -> void:
     var vToTarget = pTarget.global_position - global_position
     var nDist = vToTarget.length()
+    _FaceTarget(vToTarget)
 
     if nDist <= nAttackRange:
         nCooldown -= delta
         if nCooldown <= 0.0:
             nCooldown = nAttackInterval
-            pTarget.TakeDamage(nDamage)
-        _OrbitPatrol(delta * 0.3)
+            _FireMissile(pTarget, vToTarget)
+        _OrbitPatrol(delta, 0.3)
         return
 
     var vNext = global_position + vToTarget.normalized() * nMoveSpeed * delta
     global_position = _ClampToAnchorZone(vNext)
+
+func _FaceTarget(vToTarget: Vector2) -> void:
+    if pSprite == null or vToTarget.length_squared() <= 0.001:
+        return
+    pSprite.rotation = vToTarget.angle() + PI * 0.5
+
+func _FireMissile(pTarget, vToTarget: Vector2) -> void:
+    if pGame == null or vToTarget.length_squared() <= 0.001:
+        return
+    var vDir = vToTarget.normalized()
+    var vSpawn = global_position + vDir * 14.0
+    pGame.SpawnMissile(vSpawn, vDir, nDamage, pTarget)
+    pGame.PlayMissileLaunchSound(global_position)
 
 func _ClampToAnchorZone(vPos: Vector2) -> Vector2:
     var vFromShip = vPos - pShip.global_position
@@ -130,6 +157,3 @@ func _draw() -> void:
 
     if bTaunt:
         draw_arc(Vector2.ZERO, nTauntRange, 0.0, TAU, 28, Color(0.4, 0.7, 1.0, 0.1), 1.0, true)
-
-    if nType == UnitData.DroneType.BEAM:
-        draw_line(Vector2.ZERO, Vector2(16, 0), Color(0.35, 0.95, 0.75, 0.5), 2.0, true)
