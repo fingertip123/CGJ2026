@@ -306,6 +306,8 @@ script = ExtResource( 14 )
 
 [node name="LosePlayer" type="AudioStreamPlayer" parent="FlowUi/MusicRoot"]
 
+[node name="DangerPlayer" type="AudioStreamPlayer" parent="FlowUi/MusicRoot"]
+
 [node name="WelcomeScreen" type="Control" parent="FlowUi"]
 anchor_right = 1.0
 anchor_bottom = 1.0

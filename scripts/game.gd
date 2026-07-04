@@ -127,6 +127,8 @@ func _process(delta: float) -> void:
     if nPhase == GamePhase.MARCH or nPhase == GamePhase.ANCHOR or nPhase == GamePhase.ANCHOR_PLAN or nRefreshCooldown > 0.0:
         _UpdateUi()
 
+    pFlowUi.UpdateDangerMusic(IsShipThreatenedByEnemyBase())
+
 func IsMarchRunning() -> bool:
     return nPhase == GamePhase.MARCH or nPhase == GamePhase.ANCHOR
 
@@ -135,6 +137,16 @@ func IsEscortActive() -> bool:
 
 func IsShipAlive() -> bool:
     return pShip != null and is_instance_valid(pShip) and pShip.nHp > 0.0
+
+func IsShipThreatenedByEnemyBase() -> bool:
+    if not IsShipAlive() or not CanDroneAttack():
+        return false
+    for pBase in vEnemyBases:
+        if pBase == null or not is_instance_valid(pBase) or not pBase.bActive:
+            continue
+        if pBase.has_method("IsShipInAlertRange") and pBase.IsShipInAlertRange():
+            return true
+    return false
 
 func CanDroneAttack() -> bool:
     return nPhase == GamePhase.MARCH or nPhase == GamePhase.ANCHOR or nPhase == GamePhase.ANCHOR_PLAN

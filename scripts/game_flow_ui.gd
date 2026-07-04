@@ -10,6 +10,10 @@ const WelcomeMusic = preload("res://music/welcome.mp3")
 const BgmMusic = preload("res://music/bgm.mp3")
 const WinMusic = preload("res://music/win.mp3")
 const LoseMusic = preload("res://music/lose.mp3")
+const DangerMusic = preload("res://music/danger.mp3")
+
+const nMusicFadeSpeed = 0.85
+const nSilentDb = -80.0
 
 onready var pWelcomeScreen = $WelcomeScreen
 onready var pWinScreen = $WinScreen
@@ -24,6 +28,12 @@ onready var pWelcomePlayer = $MusicRoot/WelcomePlayer
 onready var pBgmPlayer = $MusicRoot/BgmPlayer
 onready var pWinPlayer = $MusicRoot/WinPlayer
 onready var pLosePlayer = $MusicRoot/LosePlayer
+onready var pDangerPlayer = $MusicRoot/DangerPlayer
+
+var bGameplayMusicActive = false
+var bDangerActive = false
+var nBgmFade = 1.0
+var nDangerFade = 0.0
 
 func _ready() -> void:
     layer = 100
@@ -37,7 +47,19 @@ func _ready() -> void:
     _SetupMusicPlayer(pBgmPlayer, BgmMusic, true)
     _SetupMusicPlayer(pWinPlayer, WinMusic, false)
     _SetupMusicPlayer(pLosePlayer, LoseMusic, false)
+    _SetupMusicPlayer(pDangerPlayer, DangerMusic, true)
+    set_process(true)
     ShowWelcome()
+
+func _process(delta: float) -> void:
+    if not bGameplayMusicActive:
+        return
+
+    var nTargetBgm = 0.0 if bDangerActive else 1.0
+    var nTargetDanger = 1.0 if bDangerActive else 0.0
+    nBgmFade = move_toward(nBgmFade, nTargetBgm, nMusicFadeSpeed * delta)
+    nDangerFade = move_toward(nDangerFade, nTargetDanger, nMusicFadeSpeed * delta)
+    _ApplyMusicVolumes()
 
 func _SetupTexture(pRect: TextureRect, pTexture) -> void:
     if pRect == null or pTexture == null:
@@ -57,6 +79,7 @@ func ShowWelcome() -> void:
     pWelcomeScreen.visible = true
     pWinScreen.visible = false
     pLoseScreen.visible = false
+    _ResetDangerMusic()
     _StopBgm()
     _StopResultMusic()
     _PlayWelcome()
@@ -66,6 +89,7 @@ func ShowWin() -> void:
     pWinScreen.visible = true
     pLoseScreen.visible = false
     _StopWelcome()
+    _ResetDangerMusic()
     _StopBgm()
     _PlayResult(pWinPlayer)
 
@@ -74,14 +98,25 @@ func ShowLose() -> void:
     pWinScreen.visible = false
     pLoseScreen.visible = true
     _StopWelcome()
+    _ResetDangerMusic()
     _StopBgm()
     _PlayResult(pLosePlayer)
 
 func StartGameFromWelcome() -> void:
     pWelcomeScreen.visible = false
     _StopWelcome()
+    bGameplayMusicActive = true
+    bDangerActive = false
+    nBgmFade = 1.0
+    nDangerFade = 0.0
+    _ApplyMusicVolumes()
     _PlayBgm()
     emit_signal("WelcomeFinished")
+
+func UpdateDangerMusic(bActive: bool) -> void:
+    if not bGameplayMusicActive:
+        return
+    bDangerActive = bActive
 
 func _OnStartPressed() -> void:
     StartGameFromWelcome()
@@ -101,11 +136,41 @@ func _StopWelcome() -> void:
 func _PlayBgm() -> void:
     if pBgmPlayer.stream == null:
         return
+    pBgmPlayer.volume_db = _LinearToDb(nBgmFade)
     pBgmPlayer.stop()
     pBgmPlayer.play()
 
 func _StopBgm() -> void:
     pBgmPlayer.stop()
+    pBgmPlayer.volume_db = nSilentDb
+
+func _EnsureDangerPlaying() -> void:
+    if pDangerPlayer.stream == null:
+        return
+    if not pDangerPlayer.playing:
+        pDangerPlayer.play()
+
+func _StopDanger() -> void:
+    pDangerPlayer.stop()
+    pDangerPlayer.volume_db = nSilentDb
+
+func _ResetDangerMusic() -> void:
+    bGameplayMusicActive = false
+    bDangerActive = false
+    nBgmFade = 1.0
+    nDangerFade = 0.0
+    _StopDanger()
+
+func _ApplyMusicVolumes() -> void:
+    pBgmPlayer.volume_db = _LinearToDb(nBgmFade)
+    pDangerPlayer.volume_db = _LinearToDb(nDangerFade)
+    if nDangerFade > 0.001:
+        _EnsureDangerPlaying()
+    elif pDangerPlayer.playing:
+        _StopDanger()
+
+func _LinearToDb(nLinear: float) -> float:
+    return lerp(nSilentDb, 0.0, clamp(nLinear, 0.0, 1.0))
 
 func _PlayResult(pPlayer: AudioStreamPlayer) -> void:
     if pPlayer.stream == null:
