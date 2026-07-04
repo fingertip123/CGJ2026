@@ -22,6 +22,7 @@ onready var pSpeedLabel = $UiLayer/Panel/VBox/SpeedBlock/SpeedLabel
 onready var pSpeedSlider = $UiLayer/Panel/VBox/SpeedBlock/SpeedSlider
 onready var pBackground = $BackgroundLayer/Background
 onready var pTwinkleStars = $BackgroundLayer/TwinkleStars
+onready var pNebulaSky = $BackgroundLayer/NebulaSky
 onready var pAnchorIndicator = $UiLayer/AnchorIndicator
 onready var pMinimap = $UiLayer/Minimap
 onready var pMissileRoot = $MissileRoot
@@ -185,6 +186,7 @@ func CanDroneAttack() -> bool:
 func _SetParallaxOffset(vOffset: Vector2) -> void:
     pBackground.SetCameraOffset(vOffset)
     pTwinkleStars.SetCameraOffset(vOffset)
+    pNebulaSky.SetCameraOffset(vOffset)
 
 func IsAnchored() -> bool:
     return nPhase == GamePhase.ANCHOR or nPhase == GamePhase.ANCHOR_PLAN
