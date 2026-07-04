@@ -21,11 +21,20 @@ var bHasRoute = false
 var bEditingEnabled = true
 var nDraggedHandle = RouteHandle.NONE
 var pPlanetsRoot = null
+var pShip = null
 var nCurrentFuelRange = 0.0
 var nPreviewFuel = 0.0
+var nPreviewTrimDistance = 0.0
 
 func SetPlanetsRoot(pRoot) -> void:
     pPlanetsRoot = pRoot
+    update()
+
+func SetShipReference(pShipNode) -> void:
+    pShip = pShipNode
+
+func ResetPreviewTrim() -> void:
+    nPreviewTrimDistance = 0.0
     update()
 
 func SetPreviewLaunchSpeed(nValue: float) -> void:
@@ -44,7 +53,7 @@ func SetFuelRange(nFuelAmount: float, nMaxFuelAmount: float, nBurnRate: float) -
 func ClearRoute() -> void:
     bHasRoute = false
     nDraggedHandle = RouteHandle.NONE
-    update()
+    ResetPreviewTrim()
 
 func GetRouteLength() -> float:
     return nCurrentFuelRange
@@ -159,8 +168,8 @@ func _SetDirectionHandle(vPos: Vector2) -> void:
         return
     vDirectionHandle = vPos
     bHasRoute = true
+    ResetPreviewTrim()
     emit_signal("RouteChanged")
-    update()
 
 func _ClampDirectionToFuelRange(vPos: Vector2) -> Vector2:
     if nCurrentFuelRange <= 0.0:
@@ -192,11 +201,11 @@ func _draw() -> void:
         return
 
     var oPreviewColor = Color(0.86, 0.88, 0.92, 0.75)
-    var vPreview = _BuildGravityPreview()
-    _DrawDashedPolyline(vPreview, oPreviewColor, 1.0, 8.0, 6.0)
+    var vPreview = _GetPreviewPointsForDraw()
+    if vPreview.size() >= 2:
+        _DrawDashedPolyline(vPreview, oPreviewColor, 1.0, 8.0, 6.0)
 
     if bEditingEnabled:
-        draw_line(vStart, vDirectionHandle, Color(0.45, 0.75, 1.0, 0.45), 2.0, true)
         draw_circle(vDirectionHandle, nHandleRadius, Color(1.0, 0.7, 0.15))
         draw_line(vDirectionHandle - Vector2(8, 0), vDirectionHandle + Vector2(8, 0), Color(1.0, 0.92, 0.45), 2.0, true)
         draw_line(vDirectionHandle - Vector2(0, 8), vDirectionHandle + Vector2(0, 8), Color(1.0, 0.92, 0.45), 2.0, true)
@@ -221,6 +230,83 @@ func _BuildGravityPreview() -> PoolVector2Array:
             break
 
     return vPoints
+
+func _GetPreviewPointsForDraw() -> PoolVector2Array:
+    var vPreview = _BuildGravityPreview()
+    if bEditingEnabled:
+        return vPreview
+
+    if pShip == null:
+        return PoolVector2Array()
+    if not is_instance_valid(pShip):
+        return PoolVector2Array()
+    if not pShip.bMoving:
+        return PoolVector2Array()
+
+    _AdvancePreviewTrim(vPreview, pShip.global_position)
+    return _TrimPreviewFromDistance(vPreview, nPreviewTrimDistance)
+
+func _process(_delta: float) -> void:
+    if not bEditingEnabled and bHasRoute and pShip != null and is_instance_valid(pShip) and pShip.bMoving:
+        update()
+
+func _AdvancePreviewTrim(vPoints, vShipPos: Vector2) -> void:
+    if vPoints.size() < 2:
+        return
+
+    var nCumulative = 0.0
+    var nBestTotal = 0.0
+    var nBestDistSq = INF
+
+    for i in range(1, vPoints.size()):
+        var vFrom = vPoints[i - 1]
+        var vTo = vPoints[i]
+        var vSeg = vTo - vFrom
+        var nLenSq = vSeg.length_squared()
+        var nSegLen = 0.0
+        if nLenSq > 0.001:
+            nSegLen = sqrt(nLenSq)
+        var t = 0.0
+        if nLenSq > 0.001:
+            t = clamp((vShipPos - vFrom).dot(vSeg) / nLenSq, 0.0, 1.0)
+        var vClosest = vFrom.linear_interpolate(vTo, t)
+        var nDistSq = vShipPos.distance_squared_to(vClosest)
+        var nDistAlong = nCumulative + nSegLen * t
+        if nDistSq < nBestDistSq:
+            nBestDistSq = nDistSq
+            nBestTotal = nDistAlong
+        nCumulative += nSegLen
+
+    nPreviewTrimDistance = max(nPreviewTrimDistance, nBestTotal)
+
+func _TrimPreviewFromDistance(vPoints, nTrimDistance: float):
+    if vPoints.size() < 2 or nTrimDistance <= 0.0:
+        return vPoints
+
+    var nCumulative = 0.0
+    var vTrimmed = PoolVector2Array()
+
+    for i in range(1, vPoints.size()):
+        var vFrom = vPoints[i - 1]
+        var vTo = vPoints[i]
+        var nSegLen = vFrom.distance_to(vTo)
+        var nNextCumulative = nCumulative + nSegLen
+
+        if nTrimDistance >= nNextCumulative:
+            nCumulative = nNextCumulative
+            continue
+
+        if vTrimmed.size() == 0:
+            var nRemain = nTrimDistance - nCumulative
+            var t = 0.0
+            if nSegLen > 0.001:
+                t = clamp(nRemain / nSegLen, 0.0, 1.0)
+            vTrimmed.append(vFrom.linear_interpolate(vTo, t))
+
+        vTrimmed.append(vTo)
+        nCumulative = nNextCumulative
+
+    return vTrimmed
 
 func _DrawDashedPolyline(vPoints, oColor: Color, nWidth: float, nDashLength: float, nDashGap: float) -> void:
     if vPoints.size() < 2:

@@ -77,6 +77,7 @@ func _ready() -> void:
     pRoute.SetStartPosition(pShip.global_position)
     pRoute.SetPlanetsRoot(pPlanetsRoot)
     pRoute.SetPreviewLaunchSpeed(pShip.nLaunchSpeed)
+    pRoute.SetShipReference(pShip)
     vParallaxOrigin = pShip.global_position
     _SetParallaxOffset(Vector2.ZERO)
     pAnchorIndicator.Setup(pAnchorPoint, pShip)
@@ -466,6 +467,7 @@ func _OnRouteChanged() -> void:
     _UpdateUi()
 
 func _BeginMarch() -> void:
+    pRoute.ResetPreviewTrim()
     pRoute.SetEditingEnabled(false)
     pShip.StartMarch()
     pShip.SetCameraActive(true)
