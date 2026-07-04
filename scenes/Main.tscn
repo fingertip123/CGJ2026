@@ -171,14 +171,6 @@ margin_bottom = 20.0
 size_flags_horizontal = 3
 text = "Launch"
 
-[node name="DropAnchorButton" type="Button" parent="UiLayer/Panel/VBox/ButtonRow"]
-visible = false
-margin_left = 120.0
-margin_right = 232.0
-margin_bottom = 26.0
-size_flags_horizontal = 3
-text = "Drop Anchor"
-
 [node name="ResetButton" type="Button" parent="UiLayer/Panel/VBox/ButtonRow"]
 margin_left = 180.0
 margin_right = 352.0

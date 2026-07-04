@@ -17,7 +17,6 @@ onready var pHintLabel = $UiLayer/Panel/VBox/HintLabel
 onready var pStatsLabel = $UiLayer/Panel/VBox/StatsLabel
 onready var pResultLabel = $UiLayer/Panel/VBox/ResultLabel
 onready var pStartButton = $UiLayer/Panel/VBox/ButtonRow/StartButton
-onready var pDropAnchorButton = $UiLayer/Panel/VBox/ButtonRow/DropAnchorButton
 onready var pResetButton = $UiLayer/Panel/VBox/ButtonRow/ResetButton
 onready var pSpeedLabel = $UiLayer/Panel/VBox/SpeedBlock/SpeedLabel
 onready var pSpeedSlider = $UiLayer/Panel/VBox/SpeedBlock/SpeedSlider
@@ -69,7 +68,6 @@ func _ready() -> void:
     pShip.connect("FuelDepleted", self, "_OnShipFuelDepleted")
     pShip.connect("AnchorBrakeFinished", self, "_OnAnchorBrakeFinished")
     pStartButton.connect("pressed", self, "_OnStartPressed")
-    pDropAnchorButton.connect("pressed", self, "_OnDropAnchorPressed")
     pResetButton.connect("pressed", self, "_OnResetPressed")
     pSpeedSlider.connect("value_changed", self, "_OnSpeedSliderChanged")
     pCardPool.connect("CardPressed", self, "_OnCardPressed")
@@ -532,9 +530,6 @@ func _OnStartPressed() -> void:
         return
     _BeginMarch()
 
-func _OnDropAnchorPressed() -> void:
-    _DropAnchor()
-
 func _OnResetPressed() -> void:
     get_tree().reload_current_scene()
 
@@ -588,7 +583,7 @@ func _OnRouteChanged() -> void:
     _UpdateUi()
 
 func CanFireGrapple() -> bool:
-    return nPhase == GamePhase.MARCH and pShip.bMoving
+    return nPhase == GamePhase.MARCH and pShip.bMoving and not pShip.IsBraking()
 
 func _ClearGrapple() -> void:
     if pActiveGrapple != null and is_instance_valid(pActiveGrapple):
@@ -617,7 +612,12 @@ func _FireGrapple(vMouseWorld: Vector2) -> void:
     pActiveGrapple = pGrapple
 
 func _OnGrappleAttached(pPlanet, vLocalOffset, vWorldPos) -> void:
+    if not CanDropAnchor():
+        _ClearGrapple()
+        return
     pShip.AttachTether(pPlanet, vLocalOffset, vWorldPos)
+    pShip.StartAnchorBrake()
+    _UpdateUi()
 
 func _OnGrappleMissed() -> void:
     pActiveGrapple = null
@@ -647,13 +647,6 @@ func _BeginMarch() -> void:
     vParallaxOrigin = pShip.global_position
     pSpawnManager.Reset()
     _SetPhase(GamePhase.MARCH)
-    _UpdateUi()
-
-func _DropAnchor() -> void:
-    if not CanDropAnchor():
-        return
-    _ClearGrapple()
-    pShip.StartAnchorBrake()
     _UpdateUi()
 
 func _OnAnchorBrakeFinished() -> void:
@@ -700,11 +693,11 @@ func _UpdateUi() -> void:
             if pShip.IsBraking():
                 pHintLabel.text = "Anchor deployed — braking to a stop."
             elif pShip.IsCoasting():
-                pHintLabel.text = "Out of fuel — coasting. Drop anchor to stop and mine."
-            elif pShip.IsTethered():
-                pHintLabel.text = "Grapple attached — tether slowing the ship."
+                pHintLabel.text = "Out of fuel — coasting. Right-click a planet to anchor."
+            elif pShip.IsTethered() or pShip.IsBraking():
+                pHintLabel.text = "Anchor hooked — braking to a stop."
             else:
-                pHintLabel.text = "Fuel draining. Right-click to grapple a planet. Drop anchor to stop."
+                pHintLabel.text = "Fuel draining. Right-click a planet to hook anchor and stop."
         GamePhase.ANCHOR:
             pPhaseLabel.text = "ANCHORED"
             pPhaseLabel.add_color_override("font_color", oPhaseMuted)
@@ -750,10 +743,6 @@ func _UpdateUi() -> void:
     )
 
 func _UpdateActionButtons() -> void:
-    pDropAnchorButton.visible = nPhase == GamePhase.MARCH
-    pDropAnchorButton.disabled = not CanDropAnchor()
-    pDropAnchorButton.text = "Drop Anchor"
-
     if CanPlanRoute():
         pStartButton.text = "Plan Route"
         pStartButton.disabled = false
