@@ -4,7 +4,7 @@ extends Node2D
 export(float) var nSpawnInterval = 2.4
 export(float) var nExpandDuration = 2.2
 export(float) var nRingWidth = 1.5
-export(float) var nMaxAlpha = 0.32
+export(float) var nMaxAlpha = 0.05
 export(float) var nInnerPadding = 6.0
 
 var nSpawnTimer = 0.0
