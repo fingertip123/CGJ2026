@@ -1,7 +1,8 @@
-[gd_scene load_steps=3 format=2]
+[gd_scene load_steps=4 format=2]
 
 [ext_resource path="res://scripts/player_ship.gd" type="Script" id=1]
 [ext_resource path="res://images/aircraft.png" type="Texture" id=2]
+[ext_resource path="res://scripts/thruster_flame.gd" type="Script" id=3]
 
 [node name="PlayerShip" type="Node2D"]
 script = ExtResource( 1 )
@@ -12,6 +13,10 @@ drag_margin_h_enabled = true
 drag_margin_v_enabled = true
 smoothing_enabled = true
 smoothing_speed = 4.0
+
+[node name="ThrusterFlame" type="CPUParticles2D" parent="."]
+z_index = -1
+script = ExtResource( 3 )
 
 [node name="Aircraft" type="Sprite" parent="."]
 scale = Vector2( 0.029, 0.029 )

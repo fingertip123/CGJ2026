@@ -11,6 +11,7 @@ signal AnchorBrakeFinished
 
 onready var pCamera = $Camera2D
 onready var pAircraft = $Aircraft
+onready var pThrusterFlame = $ThrusterFlame
 
 export(float) var nLaunchSpeed = 85.0
 export(float) var nMaxFlightTime = 40.0
@@ -54,6 +55,7 @@ func Setup(pRouteManager, pGameNode) -> void:
     bFuelDepletedNotified = false
     nFlightTime = 0.0
     vVelocity = Vector2.ZERO
+    _UpdateThruster()
     update()
 
 func ResetPathProgress() -> void:
@@ -65,6 +67,7 @@ func ResetPathProgress() -> void:
     nFlightTime = 0.0
     vVelocity = Vector2.ZERO
     global_position = vSpawnPosition
+    _UpdateThruster()
     update()
 
 func ResetFlightState() -> void:
@@ -75,6 +78,7 @@ func ResetFlightState() -> void:
     bFuelDepletedNotified = false
     nFlightTime = 0.0
     vVelocity = Vector2.ZERO
+    _UpdateThruster()
     update()
 
 func GetSpawnPosition() -> Vector2:
@@ -177,12 +181,14 @@ func StartMarch() -> void:
     bHasThrust = true
     bFuelDepletedNotified = false
     _UpdateHeading()
+    _UpdateThruster()
 
 func StopMarch() -> void:
     bMoving = false
     bHasThrust = false
     bBraking = false
     vVelocity = Vector2.ZERO
+    _UpdateThruster()
 
 func StartAnchorBrake() -> void:
     if not bMoving:
@@ -197,6 +203,7 @@ func _FinishAnchorBrake() -> void:
     bMoving = false
     bBraking = false
     vVelocity = Vector2.ZERO
+    _UpdateThruster()
     emit_signal("AnchorBrakeFinished")
 
 func IsInsideAnchorZone(vWorldPos: Vector2) -> bool:
@@ -210,6 +217,7 @@ func TakeDamage(nAmount: float) -> void:
     if nHp <= 0.0:
         bMoving = false
         bBraking = false
+        _UpdateThruster()
         emit_signal("Destroyed")
 
 func GetHpRatio() -> float:
@@ -219,6 +227,12 @@ func _UpdateHeading() -> void:
     if pAircraft == null or vVelocity.length_squared() <= 0.001:
         return
     pAircraft.rotation = vVelocity.angle() + PI * 0.5
+
+func _UpdateThruster() -> void:
+    if pThrusterFlame == null:
+        return
+    var bShowFlame = bMoving and bHasThrust and HasFuel() and vVelocity.length_squared() > 1.0
+    pThrusterFlame.SetActive(bShowFlame)
 
 func _process(delta: float) -> void:
     if Engine.editor_hint:
@@ -247,6 +261,8 @@ func _process(delta: float) -> void:
         global_position += vVelocity * delta
         nPathT = clamp(nFlightTime / max(nMaxFlightTime, 0.001), 0.0, 1.0)
         _UpdateHeading()
+
+    _UpdateThruster()
 
     if pGame != null and pGame.IsMarchRunning():
         nAttackCooldown -= delta
