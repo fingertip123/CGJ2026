@@ -25,105 +25,105 @@ var pShip = null
 var bActive = true
 
 func Setup(pManager, pShipNode, nDroneType: int, nSlotIndex: int, nSlotTotal: int) -> void:
-	pGame = pManager
-	pShip = pShipNode
-	nType = nDroneType
-	nOrbitSlotOffset = UnitData.GetOrbitSlotAngle(nSlotIndex, nSlotTotal)
+    pGame = pManager
+    pShip = pShipNode
+    nType = nDroneType
+    nOrbitSlotOffset = UnitData.GetOrbitSlotAngle(nSlotIndex, nSlotTotal)
 
-	var oStats = UnitData.GetDroneStats(nType)
-	nMaxHp = oStats.hp
-	nHp = nMaxHp
-	nDamage = oStats.damage
-	nAttackRange = oStats.range
-	nAttackInterval = oStats.interval
-	nMoveSpeed = oStats.move_speed
-	nOrbitSpeed = oStats.orbit_speed
-	nOrbitRadius = pShip.nAnchorRadius * oStats.orbit_radius_ratio
-	bTaunt = oStats.taunt
-	nTauntRange = oStats.taunt_range
-	oColor = oStats.color
-	bActive = true
-	nOrbitAngle = nOrbitSlotOffset
-	nCooldown = randf() * nAttackInterval
-	position = _GetOrbitPosition()
-	update()
+    var oStats = UnitData.GetDroneStats(nType)
+    nMaxHp = oStats.hp
+    nHp = nMaxHp
+    nDamage = oStats.damage
+    nAttackRange = oStats.range
+    nAttackInterval = oStats.interval
+    nMoveSpeed = oStats.move_speed
+    nOrbitSpeed = oStats.orbit_speed
+    nOrbitRadius = pShip.nAnchorRadius * oStats.orbit_radius_ratio
+    bTaunt = oStats.taunt
+    nTauntRange = oStats.taunt_range
+    oColor = oStats.color
+    bActive = true
+    nOrbitAngle = nOrbitSlotOffset
+    nCooldown = randf() * nAttackInterval
+    position = _GetOrbitPosition()
+    update()
 
 func TakeDamage(nAmount: float) -> void:
-	if not bActive:
-		return
-	nHp -= nAmount
-	update()
-	if nHp <= 0.0:
-		bActive = false
-		emit_signal("Died", self)
+    if not bActive:
+        return
+    nHp -= nAmount
+    update()
+    if nHp <= 0.0:
+        bActive = false
+        emit_signal("Died", self)
 
 func GetHpRatio() -> float:
-	return clamp(nHp / nMaxHp, 0.0, 1.0)
+    return clamp(nHp / nMaxHp, 0.0, 1.0)
 
 func _process(delta: float) -> void:
-	if not bActive or pShip == null or not is_instance_valid(pShip):
-		return
-	if pGame == null:
-		return
+    if not bActive or pShip == null or not is_instance_valid(pShip):
+        return
+    if pGame == null:
+        return
 
-	nOrbitAngle += nOrbitSpeed * delta
+    nOrbitAngle += nOrbitSpeed * delta
 
-	if not pGame.IsMarchRunning():
-		global_position = _GetOrbitPosition()
-		update()
-		return
+    if not pGame.IsMarchRunning():
+        global_position = _GetOrbitPosition()
+        update()
+        return
 
-	var pTarget = pGame.GetNearestMonsterInAnchorZone(global_position, pShip.nAnchorRadius)
-	if pTarget != null:
-		_SeekAndAttack(pTarget, delta)
-	else:
-		_OrbitPatrol(delta)
+    var pTarget = pGame.GetNearestMonsterInAnchorZone(global_position, pShip.nAnchorRadius)
+    if pTarget != null:
+        _SeekAndAttack(pTarget, delta)
+    else:
+        _OrbitPatrol(delta)
 
-	update()
+    update()
 
 func _GetOrbitPosition() -> Vector2:
-	var vDir = Vector2(cos(nOrbitAngle + nOrbitSlotOffset * 0.15), sin(nOrbitAngle + nOrbitSlotOffset * 0.15))
-	return _ClampToAnchorZone(pShip.global_position + vDir * nOrbitRadius)
+    var vDir = Vector2(cos(nOrbitAngle + nOrbitSlotOffset * 0.15), sin(nOrbitAngle + nOrbitSlotOffset * 0.15))
+    return _ClampToAnchorZone(pShip.global_position + vDir * nOrbitRadius)
 
 func _OrbitPatrol(delta: float) -> void:
-	var vTarget = _GetOrbitPosition()
-	global_position = global_position.linear_interpolate(vTarget, min(1.0, delta * 4.0))
+    var vTarget = _GetOrbitPosition()
+    global_position = global_position.linear_interpolate(vTarget, min(1.0, delta * 4.0))
 
 func _SeekAndAttack(pTarget, delta: float) -> void:
-	var vToTarget = pTarget.global_position - global_position
-	var nDist = vToTarget.length()
+    var vToTarget = pTarget.global_position - global_position
+    var nDist = vToTarget.length()
 
-	if nDist <= nAttackRange:
-		nCooldown -= delta
-		if nCooldown <= 0.0:
-			nCooldown = nAttackInterval
-			pTarget.TakeDamage(nDamage)
-		_OrbitPatrol(delta * 0.3)
-		return
+    if nDist <= nAttackRange:
+        nCooldown -= delta
+        if nCooldown <= 0.0:
+            nCooldown = nAttackInterval
+            pTarget.TakeDamage(nDamage)
+        _OrbitPatrol(delta * 0.3)
+        return
 
-	var vNext = global_position + vToTarget.normalized() * nMoveSpeed * delta
-	global_position = _ClampToAnchorZone(vNext)
+    var vNext = global_position + vToTarget.normalized() * nMoveSpeed * delta
+    global_position = _ClampToAnchorZone(vNext)
 
 func _ClampToAnchorZone(vPos: Vector2) -> Vector2:
-	var vFromShip = vPos - pShip.global_position
-	var nDist = vFromShip.length()
-	if nDist <= pShip.nAnchorRadius:
-		return vPos
-	if nDist < 0.001:
-		return pShip.global_position
-	return pShip.global_position + vFromShip.normalized() * pShip.nAnchorRadius
+    var vFromShip = vPos - pShip.global_position
+    var nDist = vFromShip.length()
+    if nDist <= pShip.nAnchorRadius:
+        return vPos
+    if nDist < 0.001:
+        return pShip.global_position
+    return pShip.global_position + vFromShip.normalized() * pShip.nAnchorRadius
 
 func _draw() -> void:
-	var nRatio = GetHpRatio()
-	var nBody = 11.0 if nType != UnitData.DroneType.SHIELD else 13.0
-	draw_circle(Vector2.ZERO, nBody + 3.0, Color(oColor.r, oColor.g, oColor.b, 0.15))
-	draw_circle(Vector2.ZERO, nBody, oColor)
-	draw_circle(Vector2.ZERO, nBody * 0.4, oColor.lightened(0.3))
-	draw_rect(Rect2(Vector2(-14, -20), Vector2(28, 3)), Color(0.1, 0.08, 0.12))
-	draw_rect(Rect2(Vector2(-14, -20), Vector2(28 * nRatio, 3)), Color(0.3, 0.9, 0.95))
+    var nRatio = GetHpRatio()
+    var nBody = 11.0 if nType != UnitData.DroneType.SHIELD else 13.0
+    draw_circle(Vector2.ZERO, nBody + 3.0, Color(oColor.r, oColor.g, oColor.b, 0.15))
+    draw_circle(Vector2.ZERO, nBody, oColor)
+    draw_circle(Vector2.ZERO, nBody * 0.4, oColor.lightened(0.3))
+    draw_rect(Rect2(Vector2(-14, -20), Vector2(28, 3)), Color(0.1, 0.08, 0.12))
+    draw_rect(Rect2(Vector2(-14, -20), Vector2(28 * nRatio, 3)), Color(0.3, 0.9, 0.95))
 
-	if bTaunt:
-		draw_arc(Vector2.ZERO, nTauntRange, 0.0, TAU, 28, Color(0.4, 0.7, 1.0, 0.1), 1.0, true)
+    if bTaunt:
+        draw_arc(Vector2.ZERO, nTauntRange, 0.0, TAU, 28, Color(0.4, 0.7, 1.0, 0.1), 1.0, true)
 
-	if nType == UnitData.DroneType.BEAM:
-		draw_line(Vector2.ZERO, Vector2(16, 0), Color(0.35, 0.95, 0.75, 0.5), 2.0, true)
+    if nType == UnitData.DroneType.BEAM:
+        draw_line(Vector2.ZERO, Vector2(16, 0), Color(0.35, 0.95, 0.75, 0.5), 2.0, true)

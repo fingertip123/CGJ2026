@@ -3,7 +3,8 @@ extends Node2D
 enum GamePhase { PREP, MARCH, WIN, LOSE }
 
 onready var pRoute = $RouteManager
-onready var pShip = $BaseAnchor
+onready var pShip = $PlayerShip
+onready var pAnchorPoint = $AnchorPoint
 onready var pSpawnManager = $SpawnManager
 onready var pDroneRoot = $DroneRoot
 onready var pMonsterRoot = $MonsterRoot
@@ -41,7 +42,9 @@ func _ready() -> void:
     pCardPool.connect("CardPressed", self, "_OnCardPressed")
     pCardPool.connect("RefreshPressed", self, "_OnRefreshPressed")
     pCardPool.connect("UpgradePressed", self, "_OnUpgradePressed")
+    pRoute.connect("RouteChanged", self, "_OnRouteChanged")
     pShip.Setup(pRoute, self)
+    pRoute.SetStartPosition(pShip.global_position)
     pSpawnManager.Setup(self, pRoute, pShip)
     _RollCardPool()
     _SetPhase(GamePhase.PREP)
@@ -50,11 +53,16 @@ func _ready() -> void:
 func _process(delta: float) -> void:
     if nRefreshCooldown > 0.0:
         nRefreshCooldown = max(0.0, nRefreshCooldown - delta)
+    if nPhase == GamePhase.MARCH and pAnchorPoint.is_docked(pShip.global_position):
+        _OnShipReachedGoal()
     if nPhase == GamePhase.MARCH or nRefreshCooldown > 0.0:
         _UpdateUi()
 
 func IsMarchRunning() -> bool:
     return nPhase == GamePhase.MARCH
+
+func CanLaunch() -> bool:
+    return nPhase == GamePhase.PREP and pRoute.HasRoute()
 
 func GetDroneMaxCount() -> int:
     return pShip.GetDroneMaxCount()
@@ -186,7 +194,7 @@ func _OnShipLevelChanged(nLevel: int) -> void:
     _UpdateUi()
 
 func _OnStartPressed() -> void:
-    if nPhase != GamePhase.PREP:
+    if not CanLaunch():
         return
     _BeginMarch()
 
@@ -216,6 +224,12 @@ func _OnUpgradePressed() -> void:
     pShip.UpgradeLevel()
     _UpdateUi()
 
+func _OnRouteChanged() -> void:
+    if nPhase != GamePhase.PREP:
+        return
+    pShip.ResetPathProgress()
+    _UpdateUi()
+
 func _BeginMarch() -> void:
     pShip.StartMarch()
     pSpawnManager.Reset()
@@ -224,14 +238,15 @@ func _BeginMarch() -> void:
 
 func _SetPhase(nNewPhase: int) -> void:
     nPhase = nNewPhase
-    pStartButton.disabled = nPhase != GamePhase.PREP
+    pRoute.SetEditingEnabled(nPhase == GamePhase.PREP)
+    pStartButton.disabled = not CanLaunch()
     pResetButton.disabled = false
 
 func _UpdateUi() -> void:
     match nPhase:
         GamePhase.PREP:
             pPhaseLabel.text = "Phase: Prep"
-            pHintLabel.text = "Deploy escort drones from card pool. They orbit the ship anchor zone."
+            pHintLabel.text = pRoute.GetEditHint() + " Deploy escort drones from card pool."
         GamePhase.MARCH:
             pPhaseLabel.text = "Phase: Flight"
             pHintLabel.text = "Drones orbit and intercept threats within anchor range."
@@ -245,6 +260,7 @@ func _UpdateUi() -> void:
     pStatsLabel.text = "Ship Lv.%d HP:%d  Gold:%d  Drones:%d/%d  Kills:%d" % [
         pShip.nLevel, int(pShip.nHp), nGold, vDrones.size(), GetDroneMaxCount(), nMonstersKilled
     ]
+    pStartButton.disabled = not CanLaunch()
 
     var bCanRefresh = nRefreshCooldown <= 0.0 and nGold >= nRefreshCost and nPhase != GamePhase.WIN and nPhase != GamePhase.LOSE
     pCardPool.UpdateDisplay(
@@ -263,7 +279,7 @@ func _UpdateUi() -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
     if event is InputEventKey and event.pressed and not event.echo:
-        if event.scancode == KEY_SPACE and nPhase == GamePhase.PREP:
+        if event.scancode == KEY_SPACE and CanLaunch():
             _BeginMarch()
         elif event.scancode == KEY_R:
             _OnResetPressed()

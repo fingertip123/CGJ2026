@@ -103,7 +103,6 @@ func _process(delta: float) -> void:
             nPathT = 1.0
             position = pRoute.GetPositionAt(1.0)
             bMoving = false
-            emit_signal("ReachedGoal")
         else:
             position = pRoute.GetPositionAt(nPathT)
 
