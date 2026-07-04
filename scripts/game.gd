@@ -11,15 +11,15 @@ onready var pMiningDroneRoot = $MiningDroneRoot
 onready var pMonsterRoot = $MonsterRoot
 onready var pPlanetsRoot = $Planets
 onready var pCardPool = $UiLayer/CardPool
-onready var pPhaseLabel = $UiLayer/Panel/VBox/PhaseLabel
+onready var pPhaseLabel = $UiLayer/Panel/VBox/HeaderRow/PhaseLabel
 onready var pHintLabel = $UiLayer/Panel/VBox/HintLabel
 onready var pStatsLabel = $UiLayer/Panel/VBox/StatsLabel
 onready var pResultLabel = $UiLayer/Panel/VBox/ResultLabel
-onready var pStartButton = $UiLayer/Panel/VBox/StartButton
-onready var pDropAnchorButton = $UiLayer/Panel/VBox/DropAnchorButton
-onready var pResetButton = $UiLayer/Panel/VBox/ResetButton
-onready var pSpeedLabel = $UiLayer/Panel/VBox/SpeedLabel
-onready var pSpeedSlider = $UiLayer/Panel/VBox/SpeedSlider
+onready var pStartButton = $UiLayer/Panel/VBox/ButtonRow/StartButton
+onready var pDropAnchorButton = $UiLayer/Panel/VBox/ButtonRow/DropAnchorButton
+onready var pResetButton = $UiLayer/Panel/VBox/ButtonRow/ResetButton
+onready var pSpeedLabel = $UiLayer/Panel/VBox/SpeedBlock/SpeedLabel
+onready var pSpeedSlider = $UiLayer/Panel/VBox/SpeedBlock/SpeedSlider
 onready var pBackground = $BackgroundLayer/Background
 onready var pTwinkleStars = $BackgroundLayer/TwinkleStars
 onready var pAnchorIndicator = $UiLayer/AnchorIndicator
@@ -429,6 +429,7 @@ func _OnShipReachedGoal() -> void:
     _SetPhase(GamePhase.WIN)
     pResultLabel.text = "Anchor reached! Mission complete."
     pResultLabel.add_color_override("font_color", Color(0.45, 0.95, 0.55))
+    pPhaseLabel.add_color_override("font_color", Color(0.45, 0.95, 0.55))
     _UpdateUi()
 
 func _OnShipDestroyed() -> void:
@@ -437,6 +438,7 @@ func _OnShipDestroyed() -> void:
     _SetPhase(GamePhase.LOSE)
     pResultLabel.text = "Ship destroyed. Deploy more escort drones."
     pResultLabel.add_color_override("font_color", Color(0.95, 0.45, 0.45))
+    pPhaseLabel.add_color_override("font_color", Color(0.95, 0.45, 0.45))
     _UpdateUi()
 
 func _OnShipFuelDepleted() -> void:
@@ -553,12 +555,16 @@ func _SetPhase(nNewPhase: int) -> void:
 
 func _UpdateUi() -> void:
     var nFuelRange = int(pRoute.GetFuelRange())
+    var oPhaseMuted = Color(0.55, 0.65, 0.78, 0.85)
+    var oPhaseAccent = Color(0.45, 0.85, 1.0)
     match nPhase:
         GamePhase.PREP:
-            pPhaseLabel.text = "Phase: Prep"
-            pHintLabel.text = pRoute.GetEditHint() + " Route range: %d px." % nFuelRange
+            pPhaseLabel.text = "PREP"
+            pPhaseLabel.add_color_override("font_color", oPhaseAccent)
+            pHintLabel.text = pRoute.GetEditHint() + "  ·  Range %d px" % nFuelRange
         GamePhase.MARCH:
-            pPhaseLabel.text = "Phase: Flight"
+            pPhaseLabel.text = "FLIGHT"
+            pPhaseLabel.add_color_override("font_color", oPhaseAccent)
             if pShip.IsBraking():
                 pHintLabel.text = "Anchor deployed — braking to a stop."
             elif pShip.IsCoasting():
@@ -566,25 +572,29 @@ func _UpdateUi() -> void:
             else:
                 pHintLabel.text = "Fuel draining. Drop anchor anytime to stop and replan."
         GamePhase.ANCHOR:
-            pPhaseLabel.text = "Phase: Anchored"
-            pHintLabel.text = "Mine for fuel/gold, then click Plan Route when ready."
+            pPhaseLabel.text = "ANCHORED"
+            pPhaseLabel.add_color_override("font_color", oPhaseMuted)
+            pHintLabel.text = "Mine for fuel/gold, then plan the next route."
         GamePhase.ANCHOR_PLAN:
-            pPhaseLabel.text = "Phase: Route Planning"
-            pHintLabel.text = pRoute.GetEditHint() + " Current fuel allows ~%d px." % nFuelRange
+            pPhaseLabel.text = "PLAN"
+            pPhaseLabel.add_color_override("font_color", oPhaseAccent)
+            pHintLabel.text = pRoute.GetEditHint() + "  ·  Range ~%d px" % nFuelRange
         GamePhase.WIN:
-            pPhaseLabel.text = "Phase: Victory"
+            pPhaseLabel.text = "VICTORY"
+            pPhaseLabel.add_color_override("font_color", Color(0.45, 0.95, 0.55))
             pHintLabel.text = "Press Reset to play again."
         GamePhase.LOSE:
-            pPhaseLabel.text = "Phase: Defeat"
+            pPhaseLabel.text = "DEFEAT"
+            pPhaseLabel.add_color_override("font_color", Color(0.95, 0.45, 0.45))
             pHintLabel.text = "Press Reset to try again."
 
-    pStatsLabel.text = "Ship Lv.%d HP:%d  Fuel:%d/%d  Gold:%d  Escort:%d/%d  Mining:%d/%d  Kills:%d  Pos:(%d,%d)" % [
+    pStatsLabel.text = "LV.%d  HP %d  FUEL %d/%d  GOLD %d\nESCORT %d/%d  MINING %d/%d  KILLS %d  POS (%d,%d)" % [
         pShip.nLevel, int(pShip.nHp), int(pShip.GetFuel()), int(pShip.GetMaxFuel()), nGold,
         vDrones.size(), GetDroneMaxCount(), vMiningDrones.size(), GetMiningDroneMaxCount(), nMonstersKilled,
         int(round(pShip.global_position.x)), int(round(pShip.global_position.y))
     ]
 
-    pSpeedLabel.text = "Launch Speed: %d" % int(round(pShip.nLaunchSpeed))
+    pSpeedLabel.text = "Launch Speed  %d" % int(round(pShip.nLaunchSpeed))
     pSpeedSlider.editable = IsRoutePlanning()
 
     _UpdateActionButtons()

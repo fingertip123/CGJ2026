@@ -1,11 +1,13 @@
 extends Control
 
 const UnitData = preload("res://scripts/unit_data.gd")
+const UiTheme = preload("res://scripts/ui_theme.gd")
 
 signal CardPressed(nIndex)
 signal RefreshPressed()
 signal UpgradePressed()
 
+onready var pBackground = $Background
 onready var pCardHBox = $CardHBox
 onready var pRefreshButton = $RefreshButton
 onready var pUpgradeButton = $UpgradeButton
@@ -15,6 +17,10 @@ onready var pPoolLabel = $PoolLabel
 var vCardButtons = []
 
 func _ready() -> void:
+    UiTheme.ApplyToControl(self)
+    pBackground.color = UiTheme.C_BG
+    UiTheme.StyleLabel(pGoldLabel, UiTheme.C_ACCENT)
+    UiTheme.StyleLabel(pPoolLabel, UiTheme.C_TEXT_MUTED)
     pRefreshButton.connect("pressed", self, "_OnRefreshPressed")
     pUpgradeButton.connect("pressed", self, "_OnUpgradePressed")
     for pChild in pCardHBox.get_children():
@@ -24,8 +30,8 @@ func _ready() -> void:
             pChild.connect("pressed", self, "_OnCardPressed", [nIndex])
 
 func UpdateDisplay(nGold: int, vCards: Array, nVisibleSlots: int, nRefreshCooldown: float, nRefreshCost: int, bCanRefresh: bool, nShipLevel: int, nUpgradeCost: int, bCanUpgrade: bool, nDroneCount: int, nDroneMax: int, nMiningCount: int, nMiningMax: int) -> void:
-    pGoldLabel.text = "Gold: %d" % nGold
-    pPoolLabel.text = "Ship Lv.%d  Escort:%d/%d  Mining:%d/%d  Cards:%d" % [
+    pGoldLabel.text = "GOLD %d" % nGold
+    pPoolLabel.text = "LV.%d  ESCORT %d/%d  MINING %d/%d  SLOTS %d" % [
         nShipLevel, nDroneCount, nDroneMax, nMiningCount, nMiningMax, nVisibleSlots
     ]
 
