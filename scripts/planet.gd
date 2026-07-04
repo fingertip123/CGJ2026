@@ -8,10 +8,6 @@ export(float) var nCollisionRadius = 14.0 setget SetCollisionRadius
 export(float) var nGravityRadius = 120.0 setget SetGravityRadius
 export(float) var nPlanetMass = 360000.0
 export(float) var nMinGravityDistance = 12.0
-export(bool) var bHasDefenseTower = true setget SetHasDefenseTower
-export(float) var nDefenseRange = 50.0 setget SetDefenseRange
-export(float) var nDefenseDamage = 10.0
-export(float) var nDefenseInterval = 0.9
 export(Color) var oPlanetColor = Color(0.45, 0.55, 0.95) setget SetPlanetColor
 export(Color) var oGravityColor = Color(0.45, 0.75, 1.0, 0.12) setget SetGravityColor
 export(int) var nFuelDepositBase = 70 setget SetFuelDepositBase
@@ -20,7 +16,6 @@ export(int) var nFuelDepositVariance = 20
 export(int) var nGoldDepositVariance = 15
 
 var pGame = null
-var nDefenseCooldown = 0.0
 var nFuelRemaining = 0
 var nGoldRemaining = 0
 var bDepositsInitialized = false
@@ -54,7 +49,6 @@ func _ApplySprite() -> void:
 
 func Setup(pGameNode) -> void:
     pGame = pGameNode
-    nDefenseCooldown = 0.0
     if not bDepositsInitialized:
         _InitDeposits()
     update()
@@ -134,14 +128,6 @@ func _SyncCollisionShape() -> void:
     pShape.radius = nCollisionRadius
     pShapeNode.shape = pShape
 
-func SetHasDefenseTower(bValue: bool) -> void:
-    bHasDefenseTower = bValue
-    update()
-
-func SetDefenseRange(nValue: float) -> void:
-    nDefenseRange = max(0.0, nValue)
-    update()
-
 func SetPlanetColor(oValue: Color) -> void:
     oPlanetColor = oValue
     update()
@@ -175,44 +161,12 @@ func _process(delta: float) -> void:
     if pGravityRipples != null and pGravityRipples.Tick(delta):
         update()
 
-    if Engine.editor_hint:
-        return
-    if not bHasDefenseTower:
-        return
-
-    nDefenseCooldown = max(0.0, nDefenseCooldown - delta)
-
-func CanAttack(vWorldPos: Vector2) -> bool:
-    return bHasDefenseTower and global_position.distance_to(vWorldPos) <= nDefenseRange
-
-func TryAttack(pTarget) -> bool:
-    if not bHasDefenseTower or nDefenseCooldown > 0.0:
-        return false
-    if pTarget == null or not is_instance_valid(pTarget) or not (pTarget is Node2D):
-        return false
-    if not CanAttack(pTarget.global_position):
-        return false
-    if not pTarget.has_method("TakeDamage"):
-        return false
-
-    nDefenseCooldown = nDefenseInterval
-    pTarget.TakeDamage(nDefenseDamage)
-    return true
-
 func _draw() -> void:
     draw_circle(Vector2.ZERO, nGravityRadius, oGravityColor)
     draw_arc(Vector2.ZERO, nGravityRadius, 0.0, TAU, 72, Color(oGravityColor.r, oGravityColor.g, oGravityColor.b, 0.35), 2.0, true)
 
     if pGravityRipples != null:
         pGravityRipples.DrawRipples(self)
-
-    if bHasDefenseTower:
-        draw_arc(Vector2.ZERO, nDefenseRange, 0.0, TAU, 64, Color(1.0, 0.35, 0.25, 0.18), 1.5, true)
-
-    if bHasDefenseTower:
-        var vBase = Vector2(0, -nPlanetRadius - 4.0)
-        draw_rect(Rect2(vBase - Vector2(8, 10), Vector2(16, 12)), Color(0.75, 0.28, 0.2))
-        draw_line(vBase - Vector2(0, 10), vBase - Vector2(0, 24), Color(1.0, 0.55, 0.35), 3.0, true)
 
     _DrawResourceBars()
 
