@@ -1,5 +1,5 @@
 tool
-extends Node2D
+extends KinematicBody2D
 
 const UnitData = preload("res://scripts/unit_data.gd")
 
@@ -12,6 +12,7 @@ signal AnchorBrakeFinished
 onready var pCamera = $Camera2D
 onready var pAircraft = $Aircraft
 onready var pThrusterFlame = $ThrusterFlame
+onready var pCollisionShape = $CollisionShape2D
 
 export(float) var nLaunchSpeed = 85.0
 export(float) var nMaxFlightTime = 40.0
@@ -21,6 +22,7 @@ export(float) var nFuelBurnRate = 5.5
 export(float) var nDistancePerFuel = 13.0
 export(float) var nAnchorBrakeDecel = 100.0
 export(float) var nAnchorBrakeStopSpeed = 6.0
+export(float) var nShipCollisionRadius = 10.0
 
 var nLevel = 1
 var nMaxHp = 500.0
@@ -59,6 +61,18 @@ func Setup(pRouteManager, pGameNode) -> void:
     vHeading = Vector2.RIGHT
     _UpdateThruster()
     update()
+
+func _ready() -> void:
+    _SyncCollisionShape()
+
+func _SyncCollisionShape() -> void:
+    if pCollisionShape == null:
+        return
+    var pShape = pCollisionShape.shape
+    if pShape == null or not (pShape is CircleShape2D):
+        pShape = CircleShape2D.new()
+        pCollisionShape.shape = pShape
+    pShape.radius = nShipCollisionRadius
 
 func ResetPathProgress() -> void:
     nPathT = 0.0
@@ -250,6 +264,45 @@ func _UpdateThruster() -> void:
     var bShowFlame = bMoving and bHasThrust and HasFuel() and vVelocity.length_squared() > 1.0
     pThrusterFlame.SetActive(bShowFlame)
 
+func _MoveWithPlanetCollision(vMotion: Vector2) -> void:
+    if vMotion.length_squared() <= 0.0001:
+        return
+
+    var vRemaining = vMotion
+    for _i in range(4):
+        var pCollision = move_and_collide(vRemaining)
+        if pCollision == null:
+            return
+        vVelocity = vVelocity.slide(pCollision.normal)
+        vRemaining = vRemaining.slide(pCollision.normal)
+        if vRemaining.length_squared() <= 0.001:
+            return
+
+func _ResolvePlanetOverlaps() -> void:
+    if pRoute == null or pRoute.pPlanetsRoot == null:
+        return
+
+    for pPlanet in pRoute.pPlanetsRoot.get_children():
+        if pPlanet == null or not is_instance_valid(pPlanet):
+            continue
+        if not pPlanet.has_method("GetPlanetRadius"):
+            continue
+
+        var nPlanetRadius = pPlanet.GetPlanetRadius()
+        var vFromPlanet = global_position - pPlanet.global_position
+        var nDist = vFromPlanet.length()
+        var nMinDist = nPlanetRadius + nShipCollisionRadius
+        if nDist >= nMinDist:
+            continue
+
+        if nDist <= 0.001:
+            vFromPlanet = Vector2.RIGHT
+        else:
+            vFromPlanet = vFromPlanet / nDist
+
+        global_position = pPlanet.global_position + vFromPlanet * nMinDist
+        vVelocity = vVelocity.slide(vFromPlanet)
+
 func _process(delta: float) -> void:
     if Engine.editor_hint:
         update()
@@ -274,7 +327,8 @@ func _process(delta: float) -> void:
                 if not bFuelDepletedNotified:
                     bFuelDepletedNotified = true
                     emit_signal("FuelDepleted")
-        global_position += vVelocity * delta
+        _MoveWithPlanetCollision(vVelocity * delta)
+        _ResolvePlanetOverlaps()
         nPathT = clamp(nFlightTime / max(nMaxFlightTime, 0.001), 0.0, 1.0)
         _UpdateHeading()
 
