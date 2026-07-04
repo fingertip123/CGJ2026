@@ -1,12 +1,13 @@
 extends Node2D
 
-enum GamePhase { PREP, MARCH, WIN, LOSE }
+enum GamePhase { PREP, MARCH, ANCHOR, ANCHOR_PLAN, WIN, LOSE }
 
 onready var pRoute = $RouteManager
 onready var pShip = $PlayerShip
 onready var pAnchorPoint = $AnchorPoint
 onready var pSpawnManager = $SpawnManager
 onready var pDroneRoot = $DroneRoot
+onready var pMiningDroneRoot = $MiningDroneRoot
 onready var pMonsterRoot = $MonsterRoot
 onready var pPlanetsRoot = $Planets
 onready var pCardPool = $UiLayer/CardPool
@@ -15,6 +16,7 @@ onready var pHintLabel = $UiLayer/Panel/VBox/HintLabel
 onready var pStatsLabel = $UiLayer/Panel/VBox/StatsLabel
 onready var pResultLabel = $UiLayer/Panel/VBox/ResultLabel
 onready var pStartButton = $UiLayer/Panel/VBox/StartButton
+onready var pDropAnchorButton = $UiLayer/Panel/VBox/DropAnchorButton
 onready var pResetButton = $UiLayer/Panel/VBox/ResetButton
 onready var pSpeedLabel = $UiLayer/Panel/VBox/SpeedLabel
 onready var pSpeedSlider = $UiLayer/Panel/VBox/SpeedSlider
@@ -22,6 +24,7 @@ onready var pBackground = $BackgroundLayer/Background
 onready var pAnchorIndicator = $UiLayer/AnchorIndicator
 
 const DroneEscortScene = preload("res://scenes/DroneEscort.tscn")
+const DroneMiningScene = preload("res://scenes/DroneMining.tscn")
 const UnitData = preload("res://scripts/unit_data.gd")
 
 export(int) var nStartGold = 60
@@ -37,6 +40,7 @@ var nMonstersKilled = 0
 var nRefreshCooldown = 0.0
 var vMonsters = []
 var vDrones = []
+var vMiningDrones = []
 var vCards = []
 var vParallaxOrigin = Vector2.ZERO
 
@@ -45,7 +49,10 @@ func _ready() -> void:
     pShip.connect("ReachedGoal", self, "_OnShipReachedGoal")
     pShip.connect("Destroyed", self, "_OnShipDestroyed")
     pShip.connect("LevelChanged", self, "_OnShipLevelChanged")
+    pShip.connect("FuelDepleted", self, "_OnShipFuelDepleted")
+    pShip.connect("AnchorBrakeFinished", self, "_OnAnchorBrakeFinished")
     pStartButton.connect("pressed", self, "_OnStartPressed")
+    pDropAnchorButton.connect("pressed", self, "_OnDropAnchorPressed")
     pResetButton.connect("pressed", self, "_OnResetPressed")
     pSpeedSlider.connect("value_changed", self, "_OnSpeedSliderChanged")
     pCardPool.connect("CardPressed", self, "_OnCardPressed")
@@ -65,6 +72,7 @@ func _ready() -> void:
     pAnchorIndicator.Setup(pAnchorPoint, pShip)
     _SetupPlanets()
     pSpawnManager.Setup(self, pRoute, pShip)
+    _SyncRouteFuelRange()
     _RollCardPool()
     _SetPhase(GamePhase.PREP)
     _UpdateUi()
@@ -74,22 +82,42 @@ func _process(delta: float) -> void:
         nRefreshCooldown = max(0.0, nRefreshCooldown - delta)
     if nPhase == GamePhase.MARCH and pAnchorPoint.is_docked(pShip.global_position):
         _OnShipReachedGoal()
+    if nPhase == GamePhase.ANCHOR:
+        _TryAutoDeployMiningDrones()
     if nPhase == GamePhase.MARCH or nPhase == GamePhase.WIN:
         pBackground.SetCameraOffset(pShip.global_position - vParallaxOrigin)
-    elif nPhase == GamePhase.PREP or nPhase == GamePhase.LOSE:
+    elif nPhase == GamePhase.PREP or nPhase == GamePhase.LOSE or nPhase == GamePhase.ANCHOR or nPhase == GamePhase.ANCHOR_PLAN:
         pBackground.SetCameraOffset(Vector2.ZERO)
 
-    if nPhase == GamePhase.MARCH or nRefreshCooldown > 0.0:
+    if nPhase == GamePhase.MARCH or nPhase == GamePhase.ANCHOR or nPhase == GamePhase.ANCHOR_PLAN or nRefreshCooldown > 0.0:
         _UpdateUi()
 
 func IsMarchRunning() -> bool:
-    return nPhase == GamePhase.MARCH
+    return nPhase == GamePhase.MARCH or nPhase == GamePhase.ANCHOR
+
+func IsAnchored() -> bool:
+    return nPhase == GamePhase.ANCHOR or nPhase == GamePhase.ANCHOR_PLAN
+
+func IsRoutePlanning() -> bool:
+    return nPhase == GamePhase.PREP or nPhase == GamePhase.ANCHOR_PLAN
+
+func GetSpawnIntervalMultiplier() -> float:
+    return 0.6 if IsAnchored() else 1.0
 
 func CanLaunch() -> bool:
-    return nPhase == GamePhase.PREP and pRoute.HasRoute()
+    return IsRoutePlanning() and pRoute.HasRoute() and pShip.HasFuel()
+
+func CanDropAnchor() -> bool:
+    return nPhase == GamePhase.MARCH and pShip.bMoving and not pShip.IsBraking()
+
+func CanPlanRoute() -> bool:
+    return nPhase == GamePhase.ANCHOR and pShip.HasFuel()
 
 func GetDroneMaxCount() -> int:
     return pShip.GetDroneMaxCount()
+
+func GetMiningDroneMaxCount() -> int:
+    return pShip.GetMiningDroneMaxCount()
 
 func GetAliveMonsterCount() -> int:
     var nCount = 0
@@ -125,6 +153,20 @@ func GetNearestMonsterInAnchorZone(vFrom: Vector2, nZoneRadius: float):
             pBest = pMonster
     return pBest
 
+func GetNearestMineablePlanet(vFrom: Vector2):
+    var pBest = null
+    var nBestDist = INF
+    for pPlanet in pPlanetsRoot.get_children():
+        if pPlanet == null or not is_instance_valid(pPlanet):
+            continue
+        if not pPlanet.has_method("HasMineableResources") or not pPlanet.HasMineableResources():
+            continue
+        var nDist = vFrom.distance_to(pPlanet.global_position)
+        if nDist < nBestDist:
+            nBestDist = nDist
+            pBest = pPlanet
+    return pBest
+
 func GetTargetForMonster(pMonster):
     var pBestTaunt = null
     var nBestDist = INF
@@ -141,6 +183,15 @@ func GetTargetForMonster(pMonster):
         return pBestTaunt
     return pShip
 
+func OnMiningDroneDelivered(nFuelAmount: float, nGoldAmount: int) -> void:
+    if nFuelAmount > 0.0 and not pShip.IsFuelFull():
+        pShip.AddFuel(nFuelAmount)
+    if nGoldAmount > 0:
+        nGold += nGoldAmount
+    if nPhase == GamePhase.ANCHOR_PLAN:
+        _SyncRouteFuelRange()
+    _UpdateUi()
+
 func AddMonster(pMonster, vPos: Vector2) -> void:
     pMonsterRoot.add_child(pMonster)
     pMonster.position = vPos
@@ -153,17 +204,27 @@ func _SetupPlanets() -> void:
         if pPlanet != null and is_instance_valid(pPlanet) and pPlanet.has_method("Setup"):
             pPlanet.Setup(self)
 
+func _SyncRouteFuelRange() -> void:
+    pRoute.SetFuelRange(pShip.GetFuel(), pShip.GetMaxFuel(), pShip.nFuelBurnRate)
+
+func _SyncRouteStart() -> void:
+    pRoute.SetStartPosition(pShip.global_position)
+
 func _RollCardPool() -> void:
     vCards.clear()
     var nSlots = pShip.GetCardSlotCount()
     for i in range(nSlots):
-        vCards.append(UnitData.GenerateRandomDroneCard())
+        vCards.append(UnitData.GenerateRandomCard())
 
 func _GenerateSingleCard() -> Dictionary:
-    return UnitData.GenerateRandomDroneCard()
+    return UnitData.GenerateRandomCard()
 
 func _CanUseCard(oCard: Dictionary) -> bool:
-    return nGold >= oCard.cost and vDrones.size() < GetDroneMaxCount()
+    if nGold < oCard.cost:
+        return false
+    if oCard.get("kind", UnitData.CardKind.ESCORT) == UnitData.CardKind.MINING:
+        return vMiningDrones.size() < GetMiningDroneMaxCount()
+    return vDrones.size() < GetDroneMaxCount()
 
 func _TryUseCard(nIndex: int) -> void:
     if nPhase == GamePhase.WIN or nPhase == GamePhase.LOSE:
@@ -176,7 +237,10 @@ func _TryUseCard(nIndex: int) -> void:
         return
 
     nGold -= oCard.cost
-    _SpawnDrone(oCard.type)
+    if oCard.get("kind", UnitData.CardKind.ESCORT) == UnitData.CardKind.MINING:
+        _SpawnMiningDrone()
+    else:
+        _SpawnDrone(oCard.type)
     vCards[nIndex] = _GenerateSingleCard()
     _UpdateUi()
 
@@ -188,6 +252,26 @@ func _SpawnDrone(nType: int) -> void:
     var nSlotTotal = max(GetDroneMaxCount(), nSlotIndex + 1)
     pDrone.Setup(self, pShip, nType, nSlotIndex, nSlotTotal)
     vDrones.append(pDrone)
+
+func _SpawnMiningDrone() -> void:
+    var pDrone = DroneMiningScene.instance()
+    pMiningDroneRoot.add_child(pDrone)
+    var nSlotIndex = vMiningDrones.size()
+    var nSlotTotal = max(GetMiningDroneMaxCount(), nSlotIndex + 1)
+    pDrone.Setup(self, pShip, nSlotIndex, nSlotTotal)
+    vMiningDrones.append(pDrone)
+    if nPhase == GamePhase.ANCHOR:
+        _TryAutoDeployMiningDrones()
+
+func _TryAutoDeployMiningDrones() -> void:
+    var pPlanet = GetNearestMineablePlanet(pShip.global_position)
+    if pPlanet == null:
+        return
+    for pDrone in vMiningDrones:
+        if pDrone == null or not is_instance_valid(pDrone):
+            continue
+        if pDrone.CanDeploy():
+            pDrone.DeployTo(pPlanet)
 
 func _OnMonsterDied(pMonster) -> void:
     nMonstersKilled += 1
@@ -205,6 +289,7 @@ func _OnDroneDied(pDrone) -> void:
 
 func _OnShipReachedGoal() -> void:
     pShip.StopMarch()
+    pShip.SetCameraActive(false)
     pAnchorIndicator.SetIndicatorVisible(false)
     _SetPhase(GamePhase.WIN)
     pResultLabel.text = "Anchor reached! Mission complete."
@@ -213,9 +298,13 @@ func _OnShipReachedGoal() -> void:
 
 func _OnShipDestroyed() -> void:
     pShip.StopMarch()
+    pShip.SetCameraActive(false)
     _SetPhase(GamePhase.LOSE)
     pResultLabel.text = "Ship destroyed. Deploy more escort drones."
     pResultLabel.add_color_override("font_color", Color(0.95, 0.45, 0.45))
+    _UpdateUi()
+
+func _OnShipFuelDepleted() -> void:
     _UpdateUi()
 
 func _OnShipLevelChanged(nLevel: int) -> void:
@@ -224,9 +313,15 @@ func _OnShipLevelChanged(nLevel: int) -> void:
     _UpdateUi()
 
 func _OnStartPressed() -> void:
+    if CanPlanRoute():
+        _BeginRoutePlanning()
+        return
     if not CanLaunch():
         return
     _BeginMarch()
+
+func _OnDropAnchorPressed() -> void:
+    _DropAnchor()
 
 func _OnResetPressed() -> void:
     get_tree().reload_current_scene()
@@ -255,7 +350,7 @@ func _OnUpgradePressed() -> void:
     _UpdateUi()
 
 func _OnSpeedSliderChanged(nValue: float) -> void:
-    if nPhase != GamePhase.PREP:
+    if not IsRoutePlanning():
         return
     _SetLaunchSpeed(nValue)
 
@@ -268,35 +363,78 @@ func _SetLaunchSpeed(nValue: float) -> void:
     _UpdateUi()
 
 func _OnRouteChanged() -> void:
-    if nPhase != GamePhase.PREP:
-        return
-    pShip.ResetPathProgress()
+    if nPhase == GamePhase.PREP:
+        pShip.ResetPathProgress()
+        _SyncRouteStart()
+    elif nPhase == GamePhase.ANCHOR_PLAN:
+        pShip.ResetFlightState()
+        _SyncRouteStart()
     _UpdateUi()
 
 func _BeginMarch() -> void:
+    pRoute.SetEditingEnabled(false)
     pShip.StartMarch()
     pShip.SetCameraActive(true)
+    vParallaxOrigin = pShip.global_position
     pSpawnManager.Reset()
     _SetPhase(GamePhase.MARCH)
     _UpdateUi()
 
+func _DropAnchor() -> void:
+    if not CanDropAnchor():
+        return
+    pShip.StartAnchorBrake()
+    _UpdateUi()
+
+func _OnAnchorBrakeFinished() -> void:
+    pShip.SetCameraActive(false)
+    pShip.UpdateSpawnPosition()
+    _SyncRouteStart()
+    pRoute.ClearRoute()
+    pRoute.SetEditingEnabled(false)
+    _SetPhase(GamePhase.ANCHOR)
+    _TryAutoDeployMiningDrones()
+    _UpdateUi()
+
+func _BeginRoutePlanning() -> void:
+    if not pShip.HasFuel():
+        return
+    pShip.UpdateSpawnPosition()
+    _SyncRouteStart()
+    _SyncRouteFuelRange()
+    pRoute.ClearRoute()
+    pRoute.SetEditingEnabled(true)
+    _SetPhase(GamePhase.ANCHOR_PLAN)
+    _UpdateUi()
+
 func _SetPhase(nNewPhase: int) -> void:
     nPhase = nNewPhase
-    pRoute.SetEditingEnabled(nPhase == GamePhase.PREP)
-    if nPhase == GamePhase.PREP or nPhase == GamePhase.LOSE:
+    pRoute.SetEditingEnabled(nPhase == GamePhase.PREP or nPhase == GamePhase.ANCHOR_PLAN)
+    if nPhase == GamePhase.PREP or nPhase == GamePhase.ANCHOR_PLAN or nPhase == GamePhase.LOSE or nPhase == GamePhase.ANCHOR:
         pShip.SetCameraActive(false)
-    pStartButton.disabled = not CanLaunch()
-    pSpeedSlider.editable = nPhase == GamePhase.PREP
     pResetButton.disabled = false
+    _UpdateActionButtons()
 
 func _UpdateUi() -> void:
+    var nFuelRange = int(pRoute.GetFuelRange())
     match nPhase:
         GamePhase.PREP:
             pPhaseLabel.text = "Phase: Prep"
-            pHintLabel.text = pRoute.GetEditHint() + " Deploy escort drones from card pool."
+            pHintLabel.text = pRoute.GetEditHint() + " Route range: %d px." % nFuelRange
         GamePhase.MARCH:
             pPhaseLabel.text = "Phase: Flight"
-            pHintLabel.text = "Drones orbit and intercept threats within anchor range."
+            if pShip.IsBraking():
+                pHintLabel.text = "Anchor deployed — braking to a stop."
+            elif pShip.IsCoasting():
+                pHintLabel.text = "Out of fuel — coasting. Drop anchor to stop and mine."
+            else:
+                pHintLabel.text = "Fuel draining. Drop anchor anytime to stop and replan."
+        GamePhase.ANCHOR:
+            pPhaseLabel.text = "Phase: Anchored"
+            pHintLabel.text = "Mine for fuel/gold, then click Plan Route when ready."
+        GamePhase.ANCHOR_PLAN:
+            pPhaseLabel.text = "Phase: Route Planning"
+            pHintLabel.text = pRoute.GetEditHint() + " Current fuel allows ~%d px." % nFuelRange
         GamePhase.WIN:
             pPhaseLabel.text = "Phase: Victory"
             pHintLabel.text = "Press Reset to play again."
@@ -304,13 +442,16 @@ func _UpdateUi() -> void:
             pPhaseLabel.text = "Phase: Defeat"
             pHintLabel.text = "Press Reset to try again."
 
-    pStatsLabel.text = "Ship Lv.%d HP:%d  Gold:%d  Drones:%d/%d  Kills:%d  Pos:(%d,%d)" % [
-        pShip.nLevel, int(pShip.nHp), nGold, vDrones.size(), GetDroneMaxCount(), nMonstersKilled,
+    pStatsLabel.text = "Ship Lv.%d HP:%d  Fuel:%d/%d  Gold:%d  Escort:%d/%d  Mining:%d/%d  Kills:%d  Pos:(%d,%d)" % [
+        pShip.nLevel, int(pShip.nHp), int(pShip.GetFuel()), int(pShip.GetMaxFuel()), nGold,
+        vDrones.size(), GetDroneMaxCount(), vMiningDrones.size(), GetMiningDroneMaxCount(), nMonstersKilled,
         int(round(pShip.global_position.x)), int(round(pShip.global_position.y))
     ]
-    pStartButton.disabled = not CanLaunch()
+
     pSpeedLabel.text = "Launch Speed: %d" % int(round(pShip.nLaunchSpeed))
-    pSpeedSlider.editable = nPhase == GamePhase.PREP
+    pSpeedSlider.editable = IsRoutePlanning()
+
+    _UpdateActionButtons()
 
     var bCanRefresh = nRefreshCooldown <= 0.0 and nGold >= nRefreshCost and nPhase != GamePhase.WIN and nPhase != GamePhase.LOSE
     pCardPool.UpdateDisplay(
@@ -324,12 +465,33 @@ func _UpdateUi() -> void:
         pShip.GetUpgradeCost(),
         pShip.CanUpgrade(),
         vDrones.size(),
-        GetDroneMaxCount()
+        GetDroneMaxCount(),
+        vMiningDrones.size(),
+        GetMiningDroneMaxCount()
     )
+
+func _UpdateActionButtons() -> void:
+    pDropAnchorButton.visible = nPhase == GamePhase.MARCH
+    pDropAnchorButton.disabled = not CanDropAnchor()
+    pDropAnchorButton.text = "Drop Anchor"
+
+    if CanPlanRoute():
+        pStartButton.text = "Plan Route"
+        pStartButton.disabled = false
+        pStartButton.visible = true
+    elif CanLaunch():
+        pStartButton.text = "Launch"
+        pStartButton.disabled = false
+        pStartButton.visible = true
+    else:
+        pStartButton.visible = IsRoutePlanning() or nPhase == GamePhase.ANCHOR
+        pStartButton.disabled = true
+        if nPhase == GamePhase.ANCHOR:
+            pStartButton.text = "Plan Route"
+        else:
+            pStartButton.text = "Launch"
 
 func _unhandled_input(event: InputEvent) -> void:
     if event is InputEventKey and event.pressed and not event.echo:
-        if event.scancode == KEY_SPACE and CanLaunch():
-            _BeginMarch()
-        elif event.scancode == KEY_R:
+        if event.scancode == KEY_R:
             _OnResetPressed()

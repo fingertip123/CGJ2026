@@ -38,7 +38,7 @@ func _process(delta: float) -> void:
     if nTimer > 0.0:
         return
 
-    nTimer = nSpawnInterval
+    nTimer = nSpawnInterval * pGame.GetSpawnIntervalMultiplier()
     _SpawnMonster()
     nSpawned += 1
 

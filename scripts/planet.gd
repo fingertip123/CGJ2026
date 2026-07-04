@@ -10,14 +10,71 @@ export(float) var nDefenseDamage = 10.0
 export(float) var nDefenseInterval = 0.9
 export(Color) var oPlanetColor = Color(0.45, 0.55, 0.95) setget SetPlanetColor
 export(Color) var oGravityColor = Color(0.45, 0.75, 1.0, 0.12) setget SetGravityColor
+export(int) var nFuelDepositBase = 70 setget SetFuelDepositBase
+export(int) var nGoldDepositBase = 45 setget SetGoldDepositBase
+export(int) var nFuelDepositVariance = 20
+export(int) var nGoldDepositVariance = 15
 
 var pGame = null
 var nDefenseCooldown = 0.0
+var nFuelRemaining = 0
+var nGoldRemaining = 0
+var bDepositsInitialized = false
+
+func _ready() -> void:
+    if Engine.editor_hint and not bDepositsInitialized:
+        _InitDeposits()
+        update()
 
 func Setup(pGameNode) -> void:
     pGame = pGameNode
     nDefenseCooldown = 0.0
+    if not bDepositsInitialized:
+        _InitDeposits()
     update()
+
+func _InitDeposits() -> void:
+    var nFuelMin = max(0, nFuelDepositBase - nFuelDepositVariance)
+    var nFuelMax = nFuelDepositBase + nFuelDepositVariance
+    var nGoldMin = max(0, nGoldDepositBase - nGoldDepositVariance)
+    var nGoldMax = nGoldDepositBase + nGoldDepositVariance
+    if Engine.editor_hint:
+        nFuelRemaining = nFuelDepositBase
+        nGoldRemaining = nGoldDepositBase
+    else:
+        nFuelRemaining = randi() % (nFuelMax - nFuelMin + 1) + nFuelMin
+        nGoldRemaining = randi() % (nGoldMax - nGoldMin + 1) + nGoldMin
+    bDepositsInitialized = true
+
+func SetFuelDepositBase(nValue: int) -> void:
+    nFuelDepositBase = max(0, nValue)
+    update()
+
+func SetGoldDepositBase(nValue: int) -> void:
+    nGoldDepositBase = max(0, nValue)
+    update()
+
+func HasMineableResources() -> bool:
+    return nFuelRemaining > 0 or nGoldRemaining > 0
+
+func GetFuelRemaining() -> int:
+    return nFuelRemaining
+
+func GetGoldRemaining() -> int:
+    return nGoldRemaining
+
+func ExtractResources(nFuelWant: float, nGoldWant: int) -> Dictionary:
+    var nFuel = int(min(nFuelWant, float(nFuelRemaining)))
+    var nGold = min(nGoldWant, nGoldRemaining)
+    nFuelRemaining = max(0, nFuelRemaining - nFuel)
+    nGoldRemaining = max(0, nGoldRemaining - nGold)
+    update()
+    return {"fuel": float(nFuel), "gold": nGold}
+
+func GetDepositRatio() -> float:
+    var nTotal = max(1, nFuelDepositBase + nGoldDepositBase)
+    var nLeft = nFuelRemaining + nGoldRemaining
+    return clamp(float(nLeft) / float(nTotal), 0.0, 1.0)
 
 func SetPlanetRadius(nValue: float) -> void:
     nPlanetRadius = max(1.0, nValue)
@@ -95,3 +152,19 @@ func _draw() -> void:
         var vBase = Vector2(0, -nPlanetRadius - 4.0)
         draw_rect(Rect2(vBase - Vector2(8, 10), Vector2(16, 12)), Color(0.75, 0.28, 0.2))
         draw_line(vBase - Vector2(0, 10), vBase - Vector2(0, 24), Color(1.0, 0.55, 0.35), 3.0, true)
+
+    _DrawResourceBars()
+
+func _DrawResourceBars() -> void:
+    var vBase = Vector2(-nPlanetRadius, nPlanetRadius + 10.0)
+    var nBarW = nPlanetRadius * 2.0
+    var nBarH = 4.0
+
+    draw_rect(Rect2(vBase, Vector2(nBarW, nBarH)), Color(0.08, 0.08, 0.12))
+    var nFuelRatio = 0.0 if nFuelDepositBase <= 0 else clamp(float(nFuelRemaining) / float(max(1, nFuelDepositBase + nFuelDepositVariance)), 0.0, 1.0)
+    draw_rect(Rect2(vBase, Vector2(nBarW * nFuelRatio, nBarH)), Color(0.35, 0.85, 1.0))
+
+    var vGoldBase = vBase + Vector2(0, 6)
+    draw_rect(Rect2(vGoldBase, Vector2(nBarW, nBarH)), Color(0.08, 0.08, 0.12))
+    var nGoldRatio = 0.0 if nGoldDepositBase <= 0 else clamp(float(nGoldRemaining) / float(max(1, nGoldDepositBase + nGoldDepositVariance)), 0.0, 1.0)
+    draw_rect(Rect2(vGoldBase, Vector2(nBarW * nGoldRatio, nBarH)), Color(0.95, 0.78, 0.25))

@@ -24,6 +24,8 @@ var pGame = null
 var pShip = null
 var bActive = true
 
+onready var pSprite = $Sprite
+
 func Setup(pManager, pShipNode, nDroneType: int, nSlotIndex: int, nSlotTotal: int) -> void:
     pGame = pManager
     pShip = pShipNode
@@ -45,8 +47,16 @@ func Setup(pManager, pShipNode, nDroneType: int, nSlotIndex: int, nSlotTotal: in
     bActive = true
     nOrbitAngle = nOrbitSlotOffset
     nCooldown = randf() * nAttackInterval
+    _ApplySprite()
     position = _GetOrbitPosition()
     update()
+
+func _ApplySprite() -> void:
+    if pSprite == null:
+        return
+    var nScale = UnitData.GetDroneTextureScale(nType)
+    pSprite.texture = UnitData.GetDroneTexture(nType)
+    pSprite.scale = Vector2(nScale, nScale)
 
 func TakeDamage(nAmount: float) -> void:
     if not bActive:
@@ -115,10 +125,6 @@ func _ClampToAnchorZone(vPos: Vector2) -> Vector2:
 
 func _draw() -> void:
     var nRatio = GetHpRatio()
-    var nBody = 11.0 if nType != UnitData.DroneType.SHIELD else 13.0
-    draw_circle(Vector2.ZERO, nBody + 3.0, Color(oColor.r, oColor.g, oColor.b, 0.15))
-    draw_circle(Vector2.ZERO, nBody, oColor)
-    draw_circle(Vector2.ZERO, nBody * 0.4, oColor.lightened(0.3))
     draw_rect(Rect2(Vector2(-14, -20), Vector2(28, 3)), Color(0.1, 0.08, 0.12))
     draw_rect(Rect2(Vector2(-14, -20), Vector2(28 * nRatio, 3)), Color(0.3, 0.9, 0.95))
 

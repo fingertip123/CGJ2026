@@ -2,13 +2,13 @@
 
 [ext_resource path="res://scripts/game.gd" type="Script" id=1]
 [ext_resource path="res://scripts/route_manager.gd" type="Script" id=2]
-[ext_resource path="res://scripts/player_ship.gd" type="Script" id=3]
 [ext_resource path="res://scripts/spawn_manager.gd" type="Script" id=4]
 [ext_resource path="res://scripts/card_pool.gd" type="Script" id=5]
 [ext_resource path="res://scripts/background.gd" type="Script" id=6]
 [ext_resource path="res://scenes/Planet.tscn" type="PackedScene" id=7]
 [ext_resource path="res://scenes/AnchorPoint.tscn" type="PackedScene" id=8]
 [ext_resource path="res://scripts/anchor_indicator.gd" type="Script" id=9]
+[ext_resource path="res://scenes/PlayerShip.tscn" type="PackedScene" id=10]
 
 [node name="Main" type="Node2D"]
 script = ExtResource( 1 )
@@ -22,21 +22,15 @@ script = ExtResource( 6 )
 [node name="RouteManager" type="Node2D" parent="."]
 script = ExtResource( 2 )
 
-[node name="PlayerShip" type="Node2D" parent="."]
+[node name="PlayerShip" parent="." instance=ExtResource( 10 )]
 position = Vector2( 140, 740 )
-script = ExtResource( 3 )
-
-[node name="Camera2D" type="Camera2D" parent="PlayerShip"]
-current = true
-drag_margin_h_enabled = true
-drag_margin_v_enabled = true
-smoothing_enabled = true
-smoothing_speed = 4.0
 
 [node name="AnchorPoint" parent="." instance=ExtResource( 8 )]
 position = Vector2( 1480, 120 )
 
 [node name="DroneRoot" type="Node2D" parent="."]
+
+[node name="MiningDroneRoot" type="Node2D" parent="."]
 
 [node name="MonsterRoot" type="Node2D" parent="."]
 
@@ -76,13 +70,13 @@ script = ExtResource( 9 )
 margin_left = 12.0
 margin_top = 12.0
 margin_right = 520.0
-margin_bottom = 250.0
+margin_bottom = 274.0
 
 [node name="VBox" type="VBoxContainer" parent="UiLayer/Panel"]
 margin_left = 10.0
 margin_top = 8.0
 margin_right = 498.0
-margin_bottom = 228.0
+margin_bottom = 252.0
 
 [node name="TitleLabel" type="Label" parent="UiLayer/Panel/VBox"]
 margin_right = 488.0
@@ -118,13 +112,20 @@ autowrap = true
 margin_top = 90.0
 margin_right = 488.0
 margin_bottom = 110.0
-text = "Launch (Space)"
+text = "Launch"
+
+[node name="DropAnchorButton" type="Button" parent="UiLayer/Panel/VBox"]
+visible = false
+margin_top = 114.0
+margin_right = 488.0
+margin_bottom = 134.0
+text = "Drop Anchor"
 
 [node name="ResetButton" type="Button" parent="UiLayer/Panel/VBox"]
 margin_top = 114.0
 margin_right = 488.0
 margin_bottom = 134.0
-text = "Reset (R)"
+text = "Reset"
 
 [node name="SpeedLabel" type="Label" parent="UiLayer/Panel/VBox"]
 margin_top = 138.0
@@ -138,7 +139,7 @@ margin_right = 488.0
 margin_bottom = 172.0
 min_value = 20.0
 max_value = 260.0
-value = 140.0
+value = 85.0
 
 [node name="CardPool" type="Control" parent="UiLayer"]
 anchor_top = 1.0

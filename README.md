@@ -62,6 +62,9 @@ Godot 2D space route prototype.
 
 - `project.godot`：Godot 项目配置，主场景为 `res://scenes/Main.tscn`。
 - `scenes/Main.tscn`：主场景，组织背景、航线、飞船、敌人生成、UI 等节点。
+- `scenes/PlayerShip.tscn`：飞船场景，可在主场景中直接拖动设置初始位置。
+- `scenes/Planet.tscn`：行星场景，可在主场景中实例化并摆放位置。
+- `scenes/AnchorPoint.tscn`：锚地场景，可在主场景中实例化并摆放位置。
 - `scripts/game.gd`：游戏主流程，负责阶段切换、资源、卡池、胜负和单位管理。
 - `scripts/route_manager.gd`：航线方向设定、引力轨道预测和路径采样。
 - `scripts/player_ship.gd`：飞船主体逻辑，包含移动、生命、升级和攻击。

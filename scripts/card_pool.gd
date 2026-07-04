@@ -23,9 +23,11 @@ func _ready() -> void:
             var nIndex = vCardButtons.size() - 1
             pChild.connect("pressed", self, "_OnCardPressed", [nIndex])
 
-func UpdateDisplay(nGold: int, vCards: Array, nVisibleSlots: int, nRefreshCooldown: float, nRefreshCost: int, bCanRefresh: bool, nShipLevel: int, nUpgradeCost: int, bCanUpgrade: bool, nDroneCount: int, nDroneMax: int) -> void:
+func UpdateDisplay(nGold: int, vCards: Array, nVisibleSlots: int, nRefreshCooldown: float, nRefreshCost: int, bCanRefresh: bool, nShipLevel: int, nUpgradeCost: int, bCanUpgrade: bool, nDroneCount: int, nDroneMax: int, nMiningCount: int, nMiningMax: int) -> void:
     pGoldLabel.text = "Gold: %d" % nGold
-    pPoolLabel.text = "Ship Lv.%d  Drones: %d/%d  Cards: %d" % [nShipLevel, nDroneCount, nDroneMax, nVisibleSlots]
+    pPoolLabel.text = "Ship Lv.%d  Escort:%d/%d  Mining:%d/%d  Cards:%d" % [
+        nShipLevel, nDroneCount, nDroneMax, nMiningCount, nMiningMax, nVisibleSlots
+    ]
 
     for i in range(vCardButtons.size()):
         var pBtn = vCardButtons[i]
@@ -35,9 +37,14 @@ func UpdateDisplay(nGold: int, vCards: Array, nVisibleSlots: int, nRefreshCooldo
         pBtn.visible = true
         if i < vCards.size():
             var oCard = vCards[i]
-            var sName = UnitData.GetDroneName(oCard.type)
-            pBtn.text = "[Drone]\n%s\n%d G" % [sName, oCard.cost]
-            var bCanBuy = nGold >= oCard.cost and nDroneCount < nDroneMax
+            var sName = UnitData.GetCardName(oCard)
+            var sTag = "[Mine]" if oCard.get("kind", UnitData.CardKind.ESCORT) == UnitData.CardKind.MINING else "[Escort]"
+            pBtn.text = "%s\n%s\n%d G" % [sTag, sName, oCard.cost]
+            var bCanBuy = false
+            if oCard.get("kind", UnitData.CardKind.ESCORT) == UnitData.CardKind.MINING:
+                bCanBuy = nGold >= oCard.cost and nMiningCount < nMiningMax
+            else:
+                bCanBuy = nGold >= oCard.cost and nDroneCount < nDroneMax
             pBtn.disabled = not bCanBuy
         else:
             pBtn.text = "-"

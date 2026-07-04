@@ -1,12 +1,33 @@
 extends Reference
 
 enum DroneType { SHIELD, BEAM, STRIKE }
+enum CardKind { ESCORT, MINING }
 
 const DRONE_NAMES = {
     DroneType.SHIELD: "Shield Escort",
     DroneType.BEAM: "Beam Escort",
     DroneType.STRIKE: "Strike Escort",
 }
+
+const MINING_DRONE_NAME = "Mining Drone"
+
+const SHIP_TEXTURE = preload("res://images/aircraft.png")
+const SHIP_TEXTURE_SCALE = 0.029
+
+const DRONE_TEXTURES = {
+    DroneType.SHIELD: preload("res://images/shield-type drone.png"),
+    DroneType.BEAM: preload("res://images/pulse-type drone.png"),
+    DroneType.STRIKE: preload("res://images/attackAircraft.png"),
+}
+
+const DRONE_TEXTURE_SCALES = {
+    DroneType.SHIELD: 0.015,
+    DroneType.BEAM: 0.013,
+    DroneType.STRIKE: 0.013,
+}
+
+const MINING_TEXTURE = preload("res://images/miningDrone.png")
+const MINING_TEXTURE_SCALE = 0.011
 
 const DRONE_STATS = {
     DroneType.SHIELD: {
@@ -50,11 +71,23 @@ const DRONE_STATS = {
     },
 }
 
+const MINING_STATS = {
+    "move_speed": 105.0,
+    "orbit_speed": 1.4,
+    "orbit_radius_ratio": 0.42,
+    "mine_time_min": 1.0,
+    "mine_time_max": 2.0,
+    "fuel_per_trip": 12.0,
+    "gold_per_trip": 10,
+    "cost": 22,
+    "color": Color(0.95, 0.72, 0.25),
+}
+
 const SHIP_LEVELS = [
-    {"card_slots": 2, "drone_max": 4, "hp": 500.0, "attack": 8.0, "attack_range": 72.0, "radius": 120.0, "upgrade_cost": 80},
-    {"card_slots": 3, "drone_max": 6, "hp": 650.0, "attack": 10.0, "attack_range": 78.0, "radius": 135.0, "upgrade_cost": 150},
-    {"card_slots": 4, "drone_max": 8, "hp": 820.0, "attack": 12.0, "attack_range": 84.0, "radius": 150.0, "upgrade_cost": 250},
-    {"card_slots": 5, "drone_max": 10, "hp": 1000.0, "attack": 15.0, "attack_range": 90.0, "radius": 165.0, "upgrade_cost": -1},
+    {"card_slots": 2, "drone_max": 4, "mining_max": 2, "hp": 500.0, "attack": 8.0, "attack_range": 72.0, "radius": 120.0, "upgrade_cost": 80},
+    {"card_slots": 3, "drone_max": 6, "mining_max": 3, "hp": 650.0, "attack": 10.0, "attack_range": 78.0, "radius": 135.0, "upgrade_cost": 150},
+    {"card_slots": 4, "drone_max": 8, "mining_max": 4, "hp": 820.0, "attack": 12.0, "attack_range": 84.0, "radius": 150.0, "upgrade_cost": 250},
+    {"card_slots": 5, "drone_max": 10, "mining_max": 5, "hp": 1000.0, "attack": 15.0, "attack_range": 90.0, "radius": 165.0, "upgrade_cost": -1},
 ]
 
 static func GetDroneStats(nType: int) -> Dictionary:
@@ -63,11 +96,45 @@ static func GetDroneStats(nType: int) -> Dictionary:
 static func GetDroneName(nType: int) -> String:
     return DRONE_NAMES[nType]
 
-static func GenerateRandomDroneCard() -> Dictionary:
+static func GetDroneTexture(nType: int):
+    return DRONE_TEXTURES.get(nType, DRONE_TEXTURES[DroneType.STRIKE])
+
+static func GetDroneTextureScale(nType: int) -> float:
+    return DRONE_TEXTURE_SCALES.get(nType, 0.013)
+
+static func GetMiningTexture():
+    return MINING_TEXTURE
+
+static func GetMiningTextureScale() -> float:
+    return MINING_TEXTURE_SCALE
+
+static func GetMiningStats() -> Dictionary:
+    return MINING_STATS
+
+static func GetMiningName() -> String:
+    return MINING_DRONE_NAME
+
+static func GenerateRandomCard() -> Dictionary:
+    if randf() < 0.32:
+        return GenerateMiningCard()
+    return GenerateRandomEscortCard()
+
+static func GenerateRandomEscortCard() -> Dictionary:
     var vTypes = [DroneType.SHIELD, DroneType.BEAM, DroneType.STRIKE]
     var nType = vTypes[randi() % vTypes.size()]
     var oStats = GetDroneStats(nType)
-    return {"type": nType, "cost": oStats.cost}
+    return {"kind": CardKind.ESCORT, "type": nType, "cost": oStats.cost}
+
+static func GenerateMiningCard() -> Dictionary:
+    return {"kind": CardKind.MINING, "type": 0, "cost": MINING_STATS.cost}
+
+static func GenerateRandomDroneCard() -> Dictionary:
+    return GenerateRandomEscortCard()
+
+static func GetCardName(oCard: Dictionary) -> String:
+    if oCard.get("kind", CardKind.ESCORT) == CardKind.MINING:
+        return GetMiningName()
+    return GetDroneName(oCard.type)
 
 static func GetLevelConfig(nLevel: int) -> Dictionary:
     var nIndex = clamp(nLevel - 1, 0, SHIP_LEVELS.size() - 1)
