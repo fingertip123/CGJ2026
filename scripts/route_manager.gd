@@ -189,19 +189,17 @@ func _draw() -> void:
         draw_arc(vStart, nCurrentFuelRange, 0.0, TAU, 72, Color(0.35, 0.85, 1.0, 0.35), 1.0, true)
 
     if not bHasRoute:
-        draw_circle(vStart, nHandleRadius, Color(0.35, 0.9, 0.45))
         return
 
+    var oPreviewColor = Color(0.86, 0.88, 0.92, 0.75)
     var vPreview = _BuildGravityPreview()
-    for i in range(vPreview.size() - 1):
-        draw_line(vPreview[i], vPreview[i + 1], Color(0.35, 0.75, 0.95, 0.85), 4.0, true)
-    _DrawDashedPolyline(vPreview, Color(0.92, 0.94, 0.96, 0.86), 2.0, 10.0, 14.0)
+    _DrawDashedPolyline(vPreview, oPreviewColor, 1.0, 8.0, 6.0)
 
-    draw_circle(vStart, 14.0, Color(0.35, 0.9, 0.45))
-    draw_line(vStart, vDirectionHandle, Color(0.45, 0.75, 1.0, 0.45), 2.0, true)
-    draw_circle(vDirectionHandle, nHandleRadius, Color(1.0, 0.7, 0.15))
-    draw_line(vDirectionHandle - Vector2(8, 0), vDirectionHandle + Vector2(8, 0), Color(1.0, 0.92, 0.45), 2.0, true)
-    draw_line(vDirectionHandle - Vector2(0, 8), vDirectionHandle + Vector2(0, 8), Color(1.0, 0.92, 0.45), 2.0, true)
+    if bEditingEnabled:
+        draw_line(vStart, vDirectionHandle, Color(0.45, 0.75, 1.0, 0.45), 2.0, true)
+        draw_circle(vDirectionHandle, nHandleRadius, Color(1.0, 0.7, 0.15))
+        draw_line(vDirectionHandle - Vector2(8, 0), vDirectionHandle + Vector2(8, 0), Color(1.0, 0.92, 0.45), 2.0, true)
+        draw_line(vDirectionHandle - Vector2(0, 8), vDirectionHandle + Vector2(0, 8), Color(1.0, 0.92, 0.45), 2.0, true)
 
 func _BuildGravityPreview() -> PoolVector2Array:
     var vPoints = PoolVector2Array()
