@@ -21,6 +21,7 @@ onready var pResetButton = $UiLayer/Panel/VBox/ResetButton
 onready var pSpeedLabel = $UiLayer/Panel/VBox/SpeedLabel
 onready var pSpeedSlider = $UiLayer/Panel/VBox/SpeedSlider
 onready var pBackground = $BackgroundLayer/Background
+onready var pTwinkleStars = $BackgroundLayer/TwinkleStars
 onready var pAnchorIndicator = $UiLayer/AnchorIndicator
 onready var pMinimap = $UiLayer/Minimap
 
@@ -69,7 +70,7 @@ func _ready() -> void:
     pRoute.SetPlanetsRoot(pPlanetsRoot)
     pRoute.SetPreviewLaunchSpeed(pShip.nLaunchSpeed)
     vParallaxOrigin = pShip.global_position
-    pBackground.SetCameraOffset(Vector2.ZERO)
+    _SetParallaxOffset(Vector2.ZERO)
     pAnchorIndicator.Setup(pAnchorPoint, pShip)
     pMinimap.Setup(pShip, pAnchorPoint, pPlanetsRoot, pRoute.oEditBounds)
     _SetupPlanets()
@@ -87,15 +88,19 @@ func _process(delta: float) -> void:
     if nPhase == GamePhase.ANCHOR:
         _TryAutoDeployMiningDrones()
     if nPhase == GamePhase.MARCH or nPhase == GamePhase.WIN:
-        pBackground.SetCameraOffset(pShip.global_position - vParallaxOrigin)
+        _SetParallaxOffset(pShip.global_position - vParallaxOrigin)
     elif nPhase == GamePhase.PREP or nPhase == GamePhase.LOSE or nPhase == GamePhase.ANCHOR or nPhase == GamePhase.ANCHOR_PLAN:
-        pBackground.SetCameraOffset(Vector2.ZERO)
+        _SetParallaxOffset(Vector2.ZERO)
 
     if nPhase == GamePhase.MARCH or nPhase == GamePhase.ANCHOR or nPhase == GamePhase.ANCHOR_PLAN or nRefreshCooldown > 0.0:
         _UpdateUi()
 
 func IsMarchRunning() -> bool:
     return nPhase == GamePhase.MARCH or nPhase == GamePhase.ANCHOR
+
+func _SetParallaxOffset(vOffset: Vector2) -> void:
+    pBackground.SetCameraOffset(vOffset)
+    pTwinkleStars.SetCameraOffset(vOffset)
 
 func IsAnchored() -> bool:
     return nPhase == GamePhase.ANCHOR or nPhase == GamePhase.ANCHOR_PLAN
