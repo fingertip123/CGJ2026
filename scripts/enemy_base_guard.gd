@@ -76,6 +76,8 @@ func _process(delta: float) -> void:
         return
     if not pBase.bActive:
         return
+    if not pGame.IsShipAlive() or not pGame.CanDroneAttack():
+        return
 
     nOrbitAngle += nOrbitSpeed * delta
 

@@ -27,6 +27,8 @@ onready var pAnchorIndicator = $UiLayer/AnchorIndicator
 onready var pMinimap = $UiLayer/Minimap
 onready var pMissileRoot = $MissileRoot
 onready var pSfxRoot = $SfxRoot
+onready var pFlowUi = $FlowUi
+onready var pGamePanel = $UiLayer/Panel
 
 const DroneEscortScene = preload("res://scenes/DroneEscort.tscn")
 const DroneMiningScene = preload("res://scenes/DroneMining.tscn")
@@ -94,7 +96,19 @@ func _ready() -> void:
     pSpawnManager.Setup(self, pRoute, pShip)
     _SyncRouteFuelRange()
     _RollCardPool()
+    pFlowUi.connect("WelcomeFinished", self, "_OnWelcomeFinished")
+    pFlowUi.connect("ResetRequested", self, "_OnResetPressed")
+    _SetGameplayUiVisible(false)
     _SetPhase(GamePhase.PREP)
+    _UpdateUi()
+
+func _SetGameplayUiVisible(bVisible: bool) -> void:
+    pGamePanel.visible = bVisible
+    pCardPool.visible = bVisible
+    pMinimap.visible = bVisible
+
+func _OnWelcomeFinished() -> void:
+    _SetGameplayUiVisible(true)
     _UpdateUi()
 
 func _process(delta: float) -> void:
@@ -117,6 +131,9 @@ func IsMarchRunning() -> bool:
 
 func IsEscortActive() -> bool:
     return nPhase != GamePhase.WIN and nPhase != GamePhase.LOSE
+
+func IsShipAlive() -> bool:
+    return pShip != null and is_instance_valid(pShip) and pShip.nHp > 0.0
 
 func CanDroneAttack() -> bool:
     return nPhase == GamePhase.MARCH or nPhase == GamePhase.ANCHOR or nPhase == GamePhase.ANCHOR_PLAN
@@ -240,6 +257,8 @@ func GetNearestMineablePlanet(vFrom: Vector2):
     return pBest
 
 func GetTargetForMonster(pMonster):
+    if not IsShipAlive():
+        return null
     var pBestDrone = null
     var nBestDist = INF
     for pDrone in vDrones:
@@ -275,18 +294,24 @@ func RegisterBaseGuard(pGuard) -> void:
     vMonsters.append(pGuard)
 
 func SpawnMissile(vSpawnPos: Vector2, vDirection: Vector2, nDamage: float, pTarget) -> void:
+    if not IsShipAlive():
+        return
     var pMissile = MissileScene.instance()
     pMissileRoot.add_child(pMissile)
     pMissile.global_position = vSpawnPos
     pMissile.Setup(vDirection, nDamage, pTarget, UnitData.GetMissileSpeed())
 
 func SpawnEnemyMissile(vSpawnPos: Vector2, vDirection: Vector2, nDamage: float, pTarget) -> void:
+    if not IsShipAlive():
+        return
     var pMissile = MissileScene.instance()
     pMissileRoot.add_child(pMissile)
     pMissile.global_position = vSpawnPos
     pMissile.Setup(vDirection, nDamage, pTarget, UnitData.GetEnemyMissileSpeed(), pMissile.MissileKind.ENEMY)
 
 func SpawnShipPulseMissile(vSpawnPos: Vector2, vDirection: Vector2, nDamage: float, pTarget) -> void:
+    if not IsShipAlive():
+        return
     var pMissile = MissileScene.instance()
     pMissileRoot.add_child(pMissile)
     pMissile.global_position = vSpawnPos
@@ -496,6 +521,7 @@ func _OnShipReachedGoal() -> void:
     pShip.SetCameraActive(false)
     pAnchorIndicator.SetIndicatorVisible(false)
     _SetPhase(GamePhase.WIN)
+    pFlowUi.ShowWin()
     pResultLabel.text = "Anchor reached! Mission complete."
     pResultLabel.add_color_override("font_color", Color(0.45, 0.95, 0.55))
     pPhaseLabel.add_color_override("font_color", Color(0.45, 0.95, 0.55))
@@ -505,10 +531,34 @@ func _OnShipDestroyed() -> void:
     pShip.StopMarch()
     pShip.SetCameraActive(false)
     _SetPhase(GamePhase.LOSE)
+    _FreezeCombatOnDefeat()
+    pFlowUi.ShowLose()
     pResultLabel.text = "Ship destroyed. Deploy more escort drones."
     pResultLabel.add_color_override("font_color", Color(0.95, 0.45, 0.45))
     pPhaseLabel.add_color_override("font_color", Color(0.95, 0.45, 0.45))
     _UpdateUi()
+
+func _ClearAllMissiles() -> void:
+    for pChild in pMissileRoot.get_children():
+        if pChild != null and is_instance_valid(pChild):
+            pChild.queue_free()
+
+func _FreezeCombatOnDefeat() -> void:
+    _ClearAllMissiles()
+    for pMonster in vMonsters:
+        if pMonster != null and is_instance_valid(pMonster):
+            pMonster.set_process(false)
+    for pDrone in vDrones:
+        if pDrone != null and is_instance_valid(pDrone):
+            pDrone.set_process(false)
+    for pDrone in vMiningDrones:
+        if pDrone != null and is_instance_valid(pDrone):
+            pDrone.set_process(false)
+    for pBase in vEnemyBases:
+        if pBase != null and is_instance_valid(pBase):
+            pBase.set_process(false)
+    if pShip != null and is_instance_valid(pShip):
+        pShip.set_process(false)
 
 func _OnShipFuelDepleted() -> void:
     _UpdateUi()

@@ -71,6 +71,8 @@ func _ResetMission() -> void:
 func _process(delta: float) -> void:
     if not bActive or pShip == null or not is_instance_valid(pShip):
         return
+    if pGame == null or not pGame.IsShipAlive():
+        return
 
     nOrbitAngle += nOrbitSpeed * delta
 
