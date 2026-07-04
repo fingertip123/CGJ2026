@@ -10,6 +10,8 @@ export(int) var nGravityPreviewSteps = 360
 export(float) var nGravityPreviewDelta = 0.05
 export(float) var nPreviewLaunchSpeed = 140.0
 export(Rect2) var oEditBounds = Rect2(Vector2.ZERO, Vector2(1600, 790))
+export(Rect2) var oPreviewBounds = Rect2(-600, -600, 2800, 2100)
+export(float) var nPreviewMaxDistance = 6000.0
 export(float) var nHandleRadius = 12.0
 export(float) var nMinDirectionLength = 32.0
 
@@ -215,9 +217,9 @@ func _BuildGravityPreview() -> PoolVector2Array:
         vVelocity += GetGravityAcceleration(vPos) * nGravityPreviewDelta
         vPos += vVelocity * nGravityPreviewDelta
         vPoints.append(vPos)
-        if vPos.distance_to(vStart) > nCurrentFuelRange * 1.35:
+        if not oPreviewBounds.has_point(vPos):
             break
-        if not oEditBounds.has_point(vPos):
+        if vStart.distance_to(vPos) >= nPreviewMaxDistance:
             break
 
     return vPoints

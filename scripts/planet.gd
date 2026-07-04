@@ -2,8 +2,9 @@ tool
 extends Node2D
 
 export(float) var nPlanetRadius = 14.0 setget SetPlanetRadius
-export(float) var nGravityRadius = 60.0 setget SetGravityRadius
-export(float) var nGravityStrength = 280.0
+export(float) var nGravityRadius = 120.0 setget SetGravityRadius
+export(float) var nPlanetMass = 360000.0
+export(float) var nMinGravityDistance = 12.0
 export(bool) var bHasDefenseTower = true setget SetHasDefenseTower
 export(float) var nDefenseRange = 50.0 setget SetDefenseRange
 export(float) var nDefenseDamage = 10.0
@@ -105,12 +106,19 @@ func IsInsideGravity(vWorldPos: Vector2) -> bool:
 
 func GetGravityAcceleration(vWorldPos: Vector2) -> Vector2:
     var vToPlanet = global_position - vWorldPos
-    var nDist = vToPlanet.length()
-    if nDist <= 0.001 or nDist > nGravityRadius:
+    var nDistSq = vToPlanet.length_squared()
+    var nMaxDistSq = nGravityRadius * nGravityRadius
+    if nDistSq >= nMaxDistSq or nDistSq <= 0.001:
         return Vector2.ZERO
 
-    var nFalloff = 1.0 - clamp(nDist / nGravityRadius, 0.0, 1.0)
-    return vToPlanet.normalized() * nGravityStrength * nFalloff
+    var nMinDist = max(nPlanetRadius, nMinGravityDistance)
+    var nSafeDistSq = max(nDistSq, nMinDist * nMinDist)
+    var nAccel = nPlanetMass / nSafeDistSq
+    return vToPlanet.normalized() * nAccel
+
+func GetCircularOrbitSpeed(nOrbitRadius: float) -> float:
+    var nRadius = clamp(nOrbitRadius, nMinGravityDistance, nGravityRadius)
+    return sqrt(nPlanetMass / nRadius)
 
 func _process(delta: float) -> void:
     if Engine.editor_hint:
