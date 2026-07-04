@@ -1,11 +1,11 @@
 tool
 extends Node2D
 
-export(float) var nPlanetRadius = 42.0 setget SetPlanetRadius
-export(float) var nGravityRadius = 180.0 setget SetGravityRadius
+export(float) var nPlanetRadius = 14.0 setget SetPlanetRadius
+export(float) var nGravityRadius = 60.0 setget SetGravityRadius
 export(float) var nGravityStrength = 280.0
 export(bool) var bHasDefenseTower = true setget SetHasDefenseTower
-export(float) var nDefenseRange = 150.0 setget SetDefenseRange
+export(float) var nDefenseRange = 50.0 setget SetDefenseRange
 export(float) var nDefenseDamage = 10.0
 export(float) var nDefenseInterval = 0.9
 export(Color) var oPlanetColor = Color(0.45, 0.55, 0.95) setget SetPlanetColor

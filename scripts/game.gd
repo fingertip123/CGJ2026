@@ -16,6 +16,8 @@ onready var pStatsLabel = $UiLayer/Panel/VBox/StatsLabel
 onready var pResultLabel = $UiLayer/Panel/VBox/ResultLabel
 onready var pStartButton = $UiLayer/Panel/VBox/StartButton
 onready var pResetButton = $UiLayer/Panel/VBox/ResetButton
+onready var pSpeedLabel = $UiLayer/Panel/VBox/SpeedLabel
+onready var pSpeedSlider = $UiLayer/Panel/VBox/SpeedSlider
 
 const DroneEscortScene = preload("res://scenes/DroneEscort.tscn")
 const UnitData = preload("res://scripts/unit_data.gd")
@@ -24,6 +26,8 @@ export(int) var nStartGold = 60
 export(int) var nKillGold = 15
 export(int) var nRefreshCost = 15
 export(float) var nRefreshCooldownMax = 6.0
+export(float) var nMinLaunchSpeed = 20.0
+export(float) var nMaxLaunchSpeed = 260.0
 
 var nPhase = GamePhase.PREP
 var nGold = 60
@@ -40,11 +44,15 @@ func _ready() -> void:
     pShip.connect("LevelChanged", self, "_OnShipLevelChanged")
     pStartButton.connect("pressed", self, "_OnStartPressed")
     pResetButton.connect("pressed", self, "_OnResetPressed")
+    pSpeedSlider.connect("value_changed", self, "_OnSpeedSliderChanged")
     pCardPool.connect("CardPressed", self, "_OnCardPressed")
     pCardPool.connect("RefreshPressed", self, "_OnRefreshPressed")
     pCardPool.connect("UpgradePressed", self, "_OnUpgradePressed")
     pRoute.connect("RouteChanged", self, "_OnRouteChanged")
     pShip.Setup(pRoute, self)
+    pSpeedSlider.min_value = nMinLaunchSpeed
+    pSpeedSlider.max_value = nMaxLaunchSpeed
+    pSpeedSlider.value = pShip.nLaunchSpeed
     pRoute.SetStartPosition(pShip.global_position)
     pRoute.SetPlanetsRoot(pPlanetsRoot)
     pRoute.SetPreviewLaunchSpeed(pShip.nLaunchSpeed)
@@ -233,6 +241,19 @@ func _OnUpgradePressed() -> void:
     pShip.UpgradeLevel()
     _UpdateUi()
 
+func _OnSpeedSliderChanged(nValue: float) -> void:
+    if nPhase != GamePhase.PREP:
+        return
+    _SetLaunchSpeed(nValue)
+
+func _SetLaunchSpeed(nValue: float) -> void:
+    var nClampedSpeed = clamp(nValue, nMinLaunchSpeed, nMaxLaunchSpeed)
+    pShip.SetLaunchSpeed(nClampedSpeed)
+    pRoute.SetPreviewLaunchSpeed(nClampedSpeed)
+    if pSpeedSlider.value != nClampedSpeed:
+        pSpeedSlider.value = nClampedSpeed
+    _UpdateUi()
+
 func _OnRouteChanged() -> void:
     if nPhase != GamePhase.PREP:
         return
@@ -249,6 +270,7 @@ func _SetPhase(nNewPhase: int) -> void:
     nPhase = nNewPhase
     pRoute.SetEditingEnabled(nPhase == GamePhase.PREP)
     pStartButton.disabled = not CanLaunch()
+    pSpeedSlider.editable = nPhase == GamePhase.PREP
     pResetButton.disabled = false
 
 func _UpdateUi() -> void:
@@ -270,6 +292,8 @@ func _UpdateUi() -> void:
         pShip.nLevel, int(pShip.nHp), nGold, vDrones.size(), GetDroneMaxCount(), nMonstersKilled
     ]
     pStartButton.disabled = not CanLaunch()
+    pSpeedLabel.text = "Launch Speed: %d" % int(round(pShip.nLaunchSpeed))
+    pSpeedSlider.editable = nPhase == GamePhase.PREP
 
     var bCanRefresh = nRefreshCooldown <= 0.0 and nGold >= nRefreshCost and nPhase != GamePhase.WIN and nPhase != GamePhase.LOSE
     pCardPool.UpdateDisplay(

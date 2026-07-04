@@ -2,14 +2,12 @@ extends Node2D
 
 signal RouteChanged
 
-export(Vector2) var vStart = Vector2(100, 500)
-export(Vector2) var vDirectionHandle = Vector2(260, 420)
-export(float) var nRouteLength = 1200.0
-export(int) var nPreviewSegments = 48
+export(Vector2) var vStart = Vector2(140, 740)
+export(Vector2) var vDirectionHandle = Vector2(360, 650)
 export(int) var nGravityPreviewSteps = 360
 export(float) var nGravityPreviewDelta = 0.05
 export(float) var nPreviewLaunchSpeed = 140.0
-export(Rect2) var oEditBounds = Rect2(Vector2.ZERO, Vector2(1024, 490))
+export(Rect2) var oEditBounds = Rect2(Vector2.ZERO, Vector2(1600, 790))
 export(float) var nHandleRadius = 12.0
 export(float) var nMinDirectionLength = 32.0
 
@@ -42,6 +40,9 @@ func SetEditingEnabled(bEnabled: bool) -> void:
 func HasRoute() -> bool:
     return bHasRoute
 
+func GetStartPosition() -> Vector2:
+    return vStart
+
 func GetDirection() -> Vector2:
     if not bHasRoute:
         return Vector2.RIGHT
@@ -49,10 +50,6 @@ func GetDirection() -> Vector2:
     if vDir.length_squared() <= 0.001:
         return Vector2.RIGHT
     return vDir.normalized()
-
-func GetEndPosition() -> Vector2:
-    return vStart + GetDirection() * nRouteLength
-
 func GetGravityAcceleration(vWorldPos: Vector2) -> Vector2:
     var vAcceleration = Vector2.ZERO
     if pPlanetsRoot == null or not is_instance_valid(pPlanetsRoot):
@@ -67,24 +64,6 @@ func GetEditHint() -> String:
     if bHasRoute:
         return "Drag the direction handle to adjust launch direction."
     return "Click a direction point to set the launch direction."
-
-func GetPositionAt(t: float) -> Vector2:
-    if not bHasRoute:
-        return vStart
-    return vStart + GetDirection() * nRouteLength * clamp(t, 0.0, 1.0)
-
-func GetNormalAt(t: float) -> Vector2:
-    if not bHasRoute:
-        return Vector2(0, -1)
-    var vDir = GetDirection()
-    return Vector2(-vDir.y, vDir.x).normalized()
-
-func GetSideSpawnPosition(t: float, nSide: int, nDistance: float) -> Vector2:
-    var vCenter = GetPositionAt(t)
-    var vNormal = GetNormalAt(t)
-    if nSide < 0:
-        vNormal *= -1.0
-    return vCenter + vNormal * nDistance
 
 func _unhandled_input(event: InputEvent) -> void:
     if not bEditingEnabled:
@@ -158,14 +137,6 @@ func _draw() -> void:
     draw_line(vDirectionHandle - Vector2(8, 0), vDirectionHandle + Vector2(8, 0), Color(1.0, 0.92, 0.45), 2.0, true)
     draw_line(vDirectionHandle - Vector2(0, 8), vDirectionHandle + Vector2(0, 8), Color(1.0, 0.92, 0.45), 2.0, true)
 
-func _BuildPreviewLine() -> PoolVector2Array:
-    var vPoints = PoolVector2Array()
-    var vEnd = GetEndPosition()
-    for i in range(nPreviewSegments + 1):
-        var t = float(i) / float(max(1, nPreviewSegments))
-        vPoints.append(vStart.linear_interpolate(vEnd, t))
-    return vPoints
-
 func _BuildGravityPreview() -> PoolVector2Array:
     var vPoints = PoolVector2Array()
     var vPos = vStart
@@ -179,8 +150,6 @@ func _BuildGravityPreview() -> PoolVector2Array:
         if not oEditBounds.has_point(vPos):
             break
 
-    if vPoints.size() < 2:
-        return _BuildPreviewLine()
     return vPoints
 
 func _DrawDashedPolyline(vPoints, oColor: Color, nWidth: float, nDashLength: float, nDashGap: float) -> void:

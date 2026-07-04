@@ -19,10 +19,11 @@ script = ExtResource( 6 )
 script = ExtResource( 2 )
 
 [node name="PlayerShip" type="Node2D" parent="."]
+position = Vector2( 140, 740 )
 script = ExtResource( 3 )
 
 [node name="AnchorPoint" parent="." instance=ExtResource( 8 )]
-position = Vector2( 940, 100 )
+position = Vector2( 1480, 120 )
 
 [node name="DroneRoot" type="Node2D" parent="."]
 
@@ -34,10 +35,20 @@ script = ExtResource( 4 )
 [node name="Planets" type="Node2D" parent="."]
 
 [node name="Planet" parent="Planets" instance=ExtResource( 7 )]
-position = Vector2( 294, 325 )
+position = Vector2( 480, 610 )
+nGravityRadius = 93.3333
+nGravityStrength = 360.0
 
 [node name="Planet2" parent="Planets" instance=ExtResource( 7 )]
-position = Vector2( 721, 250 )
+position = Vector2( 980, 300 )
+nGravityRadius = 106.667
+nGravityStrength = 390.0
+
+[node name="Planet3" parent="Planets" instance=ExtResource( 7 )]
+position = Vector2( 1260, 625 )
+nPlanetRadius = 11.3333
+nGravityRadius = 80.0
+nGravityStrength = 300.0
 
 [node name="UiLayer" type="CanvasLayer" parent="."]
 
@@ -45,13 +56,13 @@ position = Vector2( 721, 250 )
 margin_left = 12.0
 margin_top = 12.0
 margin_right = 520.0
-margin_bottom = 200.0
+margin_bottom = 250.0
 
 [node name="VBox" type="VBoxContainer" parent="UiLayer/Panel"]
 margin_left = 10.0
 margin_top = 8.0
 margin_right = 498.0
-margin_bottom = 178.0
+margin_bottom = 228.0
 
 [node name="TitleLabel" type="Label" parent="UiLayer/Panel/VBox"]
 margin_right = 488.0
@@ -95,20 +106,31 @@ margin_right = 488.0
 margin_bottom = 134.0
 text = "Reset (R)"
 
+[node name="SpeedLabel" type="Label" parent="UiLayer/Panel/VBox"]
+margin_top = 138.0
+margin_right = 488.0
+margin_bottom = 152.0
+text = "Launch Speed: 140"
+
+[node name="SpeedSlider" type="HSlider" parent="UiLayer/Panel/VBox"]
+margin_top = 156.0
+margin_right = 488.0
+margin_bottom = 172.0
+min_value = 20.0
+max_value = 260.0
+value = 140.0
+
 [node name="CardPool" type="Control" parent="UiLayer"]
 anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
 margin_top = -110.0
-margin_right = 1024.0
-rect_min_size = Vector2( 1024, 110 )
+rect_min_size = Vector2( 1600, 110 )
 script = ExtResource( 5 )
 
 [node name="Background" type="ColorRect" parent="UiLayer/CardPool"]
 anchor_right = 1.0
 anchor_bottom = 1.0
-margin_right = -1021.0
-margin_bottom = -5.0
 mouse_filter = 2
 color = Color( 0.1, 0.12, 0.16, 0.95 )
 

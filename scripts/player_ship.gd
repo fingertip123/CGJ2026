@@ -7,7 +7,6 @@ signal Destroyed
 signal LevelChanged(nLevel)
 
 export(float) var nLaunchSpeed = 140.0
-export(float) var nMaxFlightTime = 18.0
 
 var nLevel = 1
 var nMaxHp = 500.0
@@ -16,7 +15,6 @@ var nAnchorRadius = 120.0
 var nAttackDamage = 8.0
 var nAttackRange = 72.0
 var nAttackInterval = 0.55
-var nPathT = 0.0
 var bMoving = false
 var nAttackCooldown = 0.0
 var nFlightTime = 0.0
@@ -28,22 +26,23 @@ func Setup(pRouteManager, pGameNode) -> void:
     pRoute = pRouteManager
     pGame = pGameNode
     _ApplyLevelStats(false)
-    nPathT = 0.0
     bMoving = false
     nFlightTime = 0.0
     vVelocity = Vector2.ZERO
     if pRoute != null:
-        position = pRoute.GetPositionAt(0.0)
+        position = pRoute.GetStartPosition()
     update()
 
 func ResetPathProgress() -> void:
-    nPathT = 0.0
     bMoving = false
     nFlightTime = 0.0
     vVelocity = Vector2.ZERO
     if pRoute != null:
-        position = pRoute.GetPositionAt(0.0)
+        position = pRoute.GetStartPosition()
     update()
+
+func SetLaunchSpeed(nValue: float) -> void:
+    nLaunchSpeed = max(1.0, nValue)
 
 func GetLevelConfig() -> Dictionary:
     return UnitData.GetLevelConfig(nLevel)
@@ -83,13 +82,15 @@ func _ApplyLevelStats(bKeepHpRatio: bool) -> void:
 func StartMarch() -> void:
     if pRoute != null and pRoute.has_method("HasRoute") and not pRoute.HasRoute():
         return
-    nPathT = 0.0
     nFlightTime = 0.0
     vVelocity = pRoute.GetDirection() * nLaunchSpeed if pRoute != null and pRoute.has_method("GetDirection") else Vector2.RIGHT * nLaunchSpeed
     bMoving = true
 
 func StopMarch() -> void:
     bMoving = false
+
+func GetVelocity() -> Vector2:
+    return vVelocity
 
 func IsInsideAnchorZone(vWorldPos: Vector2) -> bool:
     return global_position.distance_to(vWorldPos) <= nAnchorRadius
@@ -112,9 +113,6 @@ func _process(delta: float) -> void:
         if pRoute.has_method("GetGravityAcceleration"):
             vVelocity += pRoute.GetGravityAcceleration(global_position) * delta
         global_position += vVelocity * delta
-        nPathT = clamp(nFlightTime / max(nMaxFlightTime, 0.001), 0.0, 1.0)
-        if nFlightTime >= nMaxFlightTime:
-            bMoving = false
 
     if pGame != null and pGame.IsMarchRunning():
         nAttackCooldown -= delta
