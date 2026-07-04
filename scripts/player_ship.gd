@@ -6,6 +6,8 @@ signal ReachedGoal
 signal Destroyed
 signal LevelChanged(nLevel)
 
+onready var pCamera = $Camera2D
+
 export(float) var nLaunchSpeed = 140.0
 
 var nLevel = 1
@@ -40,6 +42,11 @@ func ResetPathProgress() -> void:
     if pRoute != null:
         position = pRoute.GetStartPosition()
     update()
+
+func SetCameraActive(bActive: bool) -> void:
+    if pCamera == null:
+        return
+    pCamera.current = bActive
 
 func SetLaunchSpeed(nValue: float) -> void:
     nLaunchSpeed = max(1.0, nValue)

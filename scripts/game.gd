@@ -18,6 +18,7 @@ onready var pStartButton = $UiLayer/Panel/VBox/StartButton
 onready var pResetButton = $UiLayer/Panel/VBox/ResetButton
 onready var pSpeedLabel = $UiLayer/Panel/VBox/SpeedLabel
 onready var pSpeedSlider = $UiLayer/Panel/VBox/SpeedSlider
+onready var pBackground = $BackgroundLayer/Background
 
 const DroneEscortScene = preload("res://scenes/DroneEscort.tscn")
 const UnitData = preload("res://scripts/unit_data.gd")
@@ -36,6 +37,7 @@ var nRefreshCooldown = 0.0
 var vMonsters = []
 var vDrones = []
 var vCards = []
+var vParallaxOrigin = Vector2.ZERO
 
 func _ready() -> void:
     nGold = nStartGold
@@ -50,12 +52,15 @@ func _ready() -> void:
     pCardPool.connect("UpgradePressed", self, "_OnUpgradePressed")
     pRoute.connect("RouteChanged", self, "_OnRouteChanged")
     pShip.Setup(pRoute, self)
+    pShip.SetCameraActive(false)
     pSpeedSlider.min_value = nMinLaunchSpeed
     pSpeedSlider.max_value = nMaxLaunchSpeed
     pSpeedSlider.value = pShip.nLaunchSpeed
     pRoute.SetStartPosition(pShip.global_position)
     pRoute.SetPlanetsRoot(pPlanetsRoot)
     pRoute.SetPreviewLaunchSpeed(pShip.nLaunchSpeed)
+    vParallaxOrigin = pShip.global_position
+    pBackground.SetCameraOffset(Vector2.ZERO)
     _SetupPlanets()
     pSpawnManager.Setup(self, pRoute, pShip)
     _RollCardPool()
@@ -67,6 +72,11 @@ func _process(delta: float) -> void:
         nRefreshCooldown = max(0.0, nRefreshCooldown - delta)
     if nPhase == GamePhase.MARCH and pAnchorPoint.is_docked(pShip.global_position):
         _OnShipReachedGoal()
+    if nPhase == GamePhase.MARCH or nPhase == GamePhase.WIN:
+        pBackground.SetCameraOffset(pShip.global_position - vParallaxOrigin)
+    elif nPhase == GamePhase.PREP or nPhase == GamePhase.LOSE:
+        pBackground.SetCameraOffset(Vector2.ZERO)
+
     if nPhase == GamePhase.MARCH or nRefreshCooldown > 0.0:
         _UpdateUi()
 
@@ -192,9 +202,8 @@ func _OnDroneDied(pDrone) -> void:
     _UpdateUi()
 
 func _OnShipReachedGoal() -> void:
-    pShip.StopMarch()
     _SetPhase(GamePhase.WIN)
-    pResultLabel.text = "Anchor reached! Mission complete."
+    pResultLabel.text = "Anchor reached! Mission complete. Ship keeps drifting."
     pResultLabel.add_color_override("font_color", Color(0.45, 0.95, 0.55))
     _UpdateUi()
 
@@ -262,6 +271,7 @@ func _OnRouteChanged() -> void:
 
 func _BeginMarch() -> void:
     pShip.StartMarch()
+    pShip.SetCameraActive(true)
     pSpawnManager.Reset()
     _SetPhase(GamePhase.MARCH)
     _UpdateUi()
@@ -269,6 +279,8 @@ func _BeginMarch() -> void:
 func _SetPhase(nNewPhase: int) -> void:
     nPhase = nNewPhase
     pRoute.SetEditingEnabled(nPhase == GamePhase.PREP)
+    if nPhase == GamePhase.PREP or nPhase == GamePhase.LOSE:
+        pShip.SetCameraActive(false)
     pStartButton.disabled = not CanLaunch()
     pSpeedSlider.editable = nPhase == GamePhase.PREP
     pResetButton.disabled = false
@@ -288,8 +300,9 @@ func _UpdateUi() -> void:
             pPhaseLabel.text = "Phase: Defeat"
             pHintLabel.text = "Press Reset to try again."
 
-    pStatsLabel.text = "Ship Lv.%d HP:%d  Gold:%d  Drones:%d/%d  Kills:%d" % [
-        pShip.nLevel, int(pShip.nHp), nGold, vDrones.size(), GetDroneMaxCount(), nMonstersKilled
+    pStatsLabel.text = "Ship Lv.%d HP:%d  Gold:%d  Drones:%d/%d  Kills:%d  Pos:(%d,%d)" % [
+        pShip.nLevel, int(pShip.nHp), nGold, vDrones.size(), GetDroneMaxCount(), nMonstersKilled,
+        int(round(pShip.global_position.x)), int(round(pShip.global_position.y))
     ]
     pStartButton.disabled = not CanLaunch()
     pSpeedLabel.text = "Launch Speed: %d" % int(round(pShip.nLaunchSpeed))

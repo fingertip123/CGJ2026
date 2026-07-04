@@ -27,7 +27,7 @@ Godot 2D space route prototype.
 
 - 主场景 `scenes/Main.tscn`，入口配置在 `project.godot`。
 - 1600x900 的 2D 游戏窗口布局，上方 1600x790 为飞行区域，底部为卡池 UI。
-- `Background` 节点负责绘制飞行区域背景和网格。
+- `BackgroundLayer/Background` 负责绘制全屏宇宙背景和星点，不随相机移动露出空白。
 - `RouteManager` 使用飞船当前位置作为固定起点，只负责设定初始方向和显示轨道预测。
 - 方向设定后，可以拖拽方向点调整航线方向，并显示受行星引力影响的虚线轨道预测。
 - `Planet` 提供引力范围和引力加速度，飞船飞行时会被行星引力改变速度。
