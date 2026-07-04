@@ -63,9 +63,17 @@ func DeployTo(pPlanet) -> void:
         return
     if not pPlanet.has_method("HasMineableResources") or not pPlanet.HasMineableResources():
         return
+    if not _IsPlanetInMiningRange(pPlanet):
+        return
     pTargetPlanet = pPlanet
     nState = MiningState.TRAVEL_TO
     update()
+
+func _IsPlanetInMiningRange(pPlanet) -> bool:
+    if pShip == null or not is_instance_valid(pShip) or pPlanet == null:
+        return false
+    var nRange = UnitData.GetMiningRange()
+    return pShip.global_position.distance_to(pPlanet.global_position) <= nRange
 
 func _ResetMission() -> void:
     nState = MiningState.IDLE

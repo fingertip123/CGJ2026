@@ -2,12 +2,14 @@ extends Node2D
 
 const MonsterScene = preload("res://scenes/Monster.tscn")
 
-export(float) var nSpawnInterval = 1.6
-export(float) var nMinSpawnInterval = 0.35
-export(float) var nSpawnAccelDuration = 180.0
-export(float) var nSpawnAccelMinScale = 0.32
+export(float) var nSpawnInterval = 0.34
+export(float) var nMinSpawnInterval = 0.11
+export(float) var nSpawnAccelDuration = 150.0
+export(float) var nSpawnAccelMinScale = 0.22
 export(float) var nEdgePadding = 64.0
-export(int) var nMaxAlive = 26
+export(int) var nMaxAlive = 78
+export(int) var nSpawnBurstMin = 1
+export(int) var nSpawnBurstMax = 3
 
 var pGame = null
 var pRoute = null
@@ -23,7 +25,7 @@ func Setup(pManager, pRouteManager, pBaseNode) -> void:
     Reset()
 
 func Reset() -> void:
-    nTimer = 1.0
+    nTimer = 0.15
     nCombatTime = 0.0
     nSpawned = 0
 
@@ -41,8 +43,17 @@ func _process(delta: float) -> void:
         return
 
     nTimer = _GetSpawnInterval()
-    _SpawnMonster()
-    nSpawned += 1
+    var nBurst = _GetSpawnBurstCount()
+    for _i in range(nBurst):
+        if pGame.GetAlivePatrolMonsterCount() >= nMaxAlive:
+            break
+        _SpawnMonster()
+        nSpawned += 1
+
+func _GetSpawnBurstCount() -> int:
+    var nProgress = clamp(nCombatTime / max(nSpawnAccelDuration, 0.001), 0.0, 1.0)
+    var nBurst = nSpawnBurstMin + int(round(nProgress * float(nSpawnBurstMax - nSpawnBurstMin)))
+    return clamp(nBurst, nSpawnBurstMin, nSpawnBurstMax)
 
 func _GetSpawnInterval() -> float:
     var nBase = nSpawnInterval * pGame.GetSpawnIntervalMultiplier()

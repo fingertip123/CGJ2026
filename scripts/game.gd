@@ -65,6 +65,7 @@ var vShipPulseSfxPlayers = []
 var nShipPulseSfxIndex = 0
 var pActiveGrapple = null
 var bLateEnemyBasesSpawned = false
+var oEnemyBaseAlertState = {}
 
 func _ready() -> void:
     nGold = nStartGold
@@ -126,7 +127,13 @@ func _process(delta: float) -> void:
         _TryAutoDeployMiningDrones()
     if nPhase == GamePhase.MARCH or nPhase == GamePhase.WIN:
         _SetParallaxOffset(pShip.global_position - vParallaxOrigin)
-    elif nPhase == GamePhase.PREP or nPhase == GamePhase.LOSE or nPhase == GamePhase.ANCHOR or nPhase == GamePhase.ANCHOR_PLAN:
+    elif nPhase == GamePhase.ANCHOR_PLAN and pShip.bMoving:
+        if not pRoute.IsDraggingRoute():
+            _SyncRouteStart()
+        _SetParallaxOffset(pShip.global_position - vParallaxOrigin)
+    elif nPhase == GamePhase.PREP or nPhase == GamePhase.ANCHOR_PLAN:
+        _SetParallaxOffset(pShip.global_position - vParallaxOrigin)
+    else:
         _SetParallaxOffset(Vector2.ZERO)
 
     if nPhase == GamePhase.MARCH or nPhase == GamePhase.ANCHOR or nPhase == GamePhase.ANCHOR_PLAN or nRefreshCooldown > 0.0:
@@ -154,6 +161,25 @@ func IsShipThreatenedByEnemyBase() -> bool:
             return true
     return false
 
+func CheckEnemyBaseShock() -> void:
+    if not IsShipAlive() or not pShip.bMoving or not CanDroneAttack():
+        return
+
+    for pBase in vEnemyBases:
+        if pBase == null or not is_instance_valid(pBase) or not pBase.bActive:
+            continue
+        if not pBase.has_method("IsShipInAlertRange"):
+            continue
+
+        var nBaseId = pBase.get_instance_id()
+        var bInRange = pBase.IsShipInAlertRange()
+        var bWasInRange = oEnemyBaseAlertState.get(nBaseId, false)
+        if bInRange and not bWasInRange:
+            pShip.ApplyBaseShock(pBase)
+            if pBase.has_method("PlayShockPulse"):
+                pBase.PlayShockPulse()
+        oEnemyBaseAlertState[nBaseId] = bInRange
+
 func CanDroneAttack() -> bool:
     return nPhase == GamePhase.MARCH or nPhase == GamePhase.ANCHOR or nPhase == GamePhase.ANCHOR_PLAN
 func _SetParallaxOffset(vOffset: Vector2) -> void:
@@ -170,13 +196,23 @@ func GetSpawnIntervalMultiplier() -> float:
     return 0.6 if IsAnchored() else 1.0
 
 func CanLaunch() -> bool:
-    return IsRoutePlanning() and pRoute.HasRoute() and pShip.HasFuel()
+    return IsRoutePlanning() and pRoute.HasRoute() and pShip.CanAffordLaunch()
+
+func CanResumeFlight() -> bool:
+    return nPhase == GamePhase.ANCHOR_PLAN and pShip.bMoving and pRoute.HasRoute() and not CanLaunch()
 
 func CanDropAnchor() -> bool:
-    return nPhase == GamePhase.MARCH and pShip.bMoving and not pShip.IsBraking()
+    return _IsFlightControlPhase() and pShip.bMoving and not pShip.IsBraking() and not pShip.IsBaseShockSlowdown()
+
+func _IsFlightControlPhase() -> bool:
+    return nPhase == GamePhase.MARCH or nPhase == GamePhase.ANCHOR_PLAN
 
 func CanPlanRoute() -> bool:
-    return nPhase == GamePhase.ANCHOR and pShip.HasFuel()
+    if nPhase == GamePhase.WIN or nPhase == GamePhase.LOSE or nPhase == GamePhase.PREP:
+        return false
+    if IsRoutePlanning():
+        return false
+    return nPhase == GamePhase.ANCHOR or nPhase == GamePhase.MARCH
 
 func GetDroneMaxCount() -> int:
     return pShip.GetDroneMaxCount()
@@ -261,7 +297,10 @@ func GetNearestMonsterInAnchorZone(vFrom: Vector2, nZoneRadius: float):
             pBest = pBase
     return pBest
 
-func GetNearestMineablePlanet(vFrom: Vector2):
+func GetMiningRange() -> float:
+    return UnitData.GetMiningRange()
+
+func GetNearestMineablePlanet(vFrom: Vector2, nMaxRange: float = -1.0):
     var pBest = null
     var nBestDist = INF
     for pPlanet in pPlanetsRoot.get_children():
@@ -270,6 +309,8 @@ func GetNearestMineablePlanet(vFrom: Vector2):
         if not pPlanet.has_method("HasMineableResources") or not pPlanet.HasMineableResources():
             continue
         var nDist = vFrom.distance_to(pPlanet.global_position)
+        if nMaxRange > 0.0 and nDist > nMaxRange:
+            continue
         if nDist < nBestDist:
             nBestDist = nDist
             pBest = pPlanet
@@ -551,7 +592,11 @@ func _SetupEnemyBases() -> void:
         vEnemyBases.append(pBase)
 
 func _SyncRouteFuelRange() -> void:
-    pRoute.SetFuelRange(pShip.GetFuel(), pShip.GetMaxFuel(), pShip.GetEffectiveFuelBurnRate())
+    pRoute.SetFuelRange(
+        pShip.GetFuelForRoutePlanning(),
+        pShip.GetMaxFuelForRoutePlanning(),
+        pShip.GetEffectiveFuelBurnRate()
+    )
 
 func _SyncRouteStart() -> void:
     pRoute.SyncStartFromShip(pShip.global_position)
@@ -613,7 +658,7 @@ func _SpawnMiningDrone() -> void:
         _TryAutoDeployMiningDrones()
 
 func _TryAutoDeployMiningDrones() -> void:
-    var pPlanet = GetNearestMineablePlanet(pShip.global_position)
+    var pPlanet = GetNearestMineablePlanet(pShip.global_position, GetMiningRange())
     if pPlanet == null:
         return
     for pDrone in vMiningDrones:
@@ -632,6 +677,9 @@ func _OnMonsterDied(pMonster) -> void:
 
 func _OnEnemyBaseDied(pBase) -> void:
     nGold += nKillGold * 4
+    oEnemyBaseAlertState.erase(pBase.get_instance_id())
+    if pShip.has_method("OnShockSourceBaseDestroyed"):
+        pShip.OnShockSourceBaseDestroyed(pBase)
     vEnemyBases.erase(pBase)
     if is_instance_valid(pBase):
         pBase.queue_free()
@@ -708,9 +756,11 @@ func _OnStartPressed() -> void:
     if CanPlanRoute():
         _BeginRoutePlanning()
         return
-    if not CanLaunch():
+    if CanLaunch():
+        _BeginMarch()
         return
-    _BeginMarch()
+    if CanResumeFlight():
+        _ResumeFlight()
 
 func _OnResetPressed() -> void:
     get_tree().reload_current_scene()
@@ -736,7 +786,7 @@ func _OnUpgradePressed() -> void:
         return
     nGold -= nCost
     pShip.UpgradeLevel()
-    if nPhase == GamePhase.ANCHOR or nPhase == GamePhase.ANCHOR_PLAN:
+    if nPhase == GamePhase.ANCHOR or nPhase == GamePhase.ANCHOR_PLAN or nPhase == GamePhase.MARCH:
         _SyncRouteStart()
         _SyncRouteFuelRange()
     _UpdateUi()
@@ -760,12 +810,13 @@ func _OnRouteChanged() -> void:
         pShip.ResetPathProgress()
         _SyncRouteStart()
     elif nPhase == GamePhase.ANCHOR_PLAN:
-        pShip.ResetFlightState()
+        if not pShip.bMoving:
+            pShip.ResetFlightState()
         _SyncRouteStart()
     _UpdateUi()
 
 func CanFireGrapple() -> bool:
-    return nPhase == GamePhase.MARCH and pShip.bMoving and not pShip.IsBraking()
+    return CanDropAnchor()
 
 func _ClearGrapple() -> void:
     if pActiveGrapple != null and is_instance_valid(pActiveGrapple):
@@ -819,6 +870,8 @@ func GetGrappleChainEndLocal(pShip) -> Dictionary:
     return {"valid": true, "pos": vLocal, "dir": vTowardShip}
 
 func _BeginMarch() -> void:
+    if not pRoute.HasRoute() or not pShip.CanAffordLaunch():
+        return
     _ClearGrapple()
     pRoute.ResetPreviewTrim()
     pRoute.SetEditingEnabled(false)
@@ -828,6 +881,24 @@ func _BeginMarch() -> void:
     pShip.SetCameraActive(true)
     vParallaxOrigin = pShip.global_position
     pSpawnManager.Reset()
+    _SetPhase(GamePhase.MARCH)
+    _UpdateUi()
+
+func _ResumeFlight() -> void:
+    if not CanResumeFlight():
+        return
+    _ClearGrapple()
+    pRoute.ResetPreviewTrim()
+    pRoute.SetEditingEnabled(false)
+    _SyncRouteStart()
+    if pShip.IsCoasting() or (pShip.bMoving and not pShip.bHasThrust):
+        var vDir = pRoute.GetDirection()
+        var nSpeed = max(pShip.GetVelocity().length(), pShip.nCoastMinSpeed)
+        pShip.vVelocity = vDir * nSpeed
+        pShip._UpdateHeading()
+    pShip.SetCameraActive(true)
+    if vParallaxOrigin == Vector2.ZERO:
+        vParallaxOrigin = pShip.global_position
     _SetPhase(GamePhase.MARCH)
     _UpdateUi()
 
@@ -842,21 +913,28 @@ func _OnAnchorBrakeFinished() -> void:
     _UpdateUi()
 
 func _BeginRoutePlanning() -> void:
-    if not pShip.HasFuel():
+    if not CanPlanRoute():
         return
+    _ClearGrapple()
     pShip.UpdateSpawnPosition()
     _SyncRouteStart()
     _SyncRouteFuelRange()
     pRoute.ClearRoute()
     pRoute.SetEditingEnabled(true)
+    if vParallaxOrigin == Vector2.ZERO or nPhase == GamePhase.ANCHOR:
+        vParallaxOrigin = pShip.global_position
     _SetPhase(GamePhase.ANCHOR_PLAN)
     _UpdateUi()
 
 func _SetPhase(nNewPhase: int) -> void:
     nPhase = nNewPhase
     pRoute.SetEditingEnabled(nPhase == GamePhase.PREP or nPhase == GamePhase.ANCHOR_PLAN)
-    if nPhase == GamePhase.PREP or nPhase == GamePhase.ANCHOR_PLAN or nPhase == GamePhase.LOSE or nPhase == GamePhase.ANCHOR:
+    if nPhase == GamePhase.PREP or nPhase == GamePhase.ANCHOR_PLAN:
+        pShip.SetCameraActive(true)
+    elif nPhase == GamePhase.LOSE or nPhase == GamePhase.ANCHOR:
         pShip.SetCameraActive(false)
+    elif nPhase == GamePhase.MARCH:
+        pShip.SetCameraActive(true)
     pResetButton.disabled = false
     _UpdateActionButtons()
 
@@ -875,19 +953,22 @@ func _UpdateUi() -> void:
             if pShip.IsBraking():
                 pHintLabel.text = "Anchor deployed — braking to a stop."
             elif pShip.IsCoasting():
-                pHintLabel.text = "Out of fuel — drifting slowly. Right-click a planet to anchor."
+                pHintLabel.text = "Out of fuel — drifting slowly. Plan Route anytime, or hook a planet to anchor."
             elif pShip.IsTethered() or pShip.IsBraking():
                 pHintLabel.text = "Anchor hooked — braking to a stop."
             else:
-                pHintLabel.text = "Fuel draining. Right-click a planet to hook anchor and stop."
+                pHintLabel.text = "In flight. Plan Route anytime, or hook a planet to stop."
         GamePhase.ANCHOR:
             pPhaseLabel.text = "ANCHORED"
             pPhaseLabel.add_color_override("font_color", oPhaseMuted)
-            pHintLabel.text = "Mine for fuel/gold, then plan the next route."
+            pHintLabel.text = "Plan a new route anytime, or mine nearby planets for fuel/gold."
         GamePhase.ANCHOR_PLAN:
             pPhaseLabel.text = "PLAN"
             pPhaseLabel.add_color_override("font_color", oPhaseAccent)
-            pHintLabel.text = pRoute.GetEditHint() + "  ·  Range ~%d px" % nFuelRange
+            if pShip.bMoving:
+                pHintLabel.text = pRoute.GetEditHint() + "  ·  Launch/Resume when ready, or hook a planet."
+            else:
+                pHintLabel.text = pRoute.GetEditHint() + "  ·  Range ~%d px" % nFuelRange
         GamePhase.WIN:
             pPhaseLabel.text = "VICTORY"
             pPhaseLabel.add_color_override("font_color", Color(0.45, 0.95, 0.55))
@@ -933,10 +1014,14 @@ func _UpdateActionButtons() -> void:
         pStartButton.text = "Launch"
         pStartButton.disabled = false
         pStartButton.visible = true
+    elif CanResumeFlight():
+        pStartButton.text = "Resume"
+        pStartButton.disabled = false
+        pStartButton.visible = true
     else:
-        pStartButton.visible = IsRoutePlanning() or nPhase == GamePhase.ANCHOR
+        pStartButton.visible = IsRoutePlanning() or CanPlanRoute()
         pStartButton.disabled = true
-        if nPhase == GamePhase.ANCHOR:
+        if CanPlanRoute() or nPhase == GamePhase.ANCHOR:
             pStartButton.text = "Plan Route"
         else:
             pStartButton.text = "Launch"

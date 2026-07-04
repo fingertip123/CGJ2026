@@ -5,7 +5,7 @@ signal RouteChanged
 export(Vector2) var vStart = Vector2(840, 4440)
 export(Vector2) var vDirectionHandle = Vector2(2160, 3900)
 export(float) var nMaxRouteLengthAtFullFuel = 4920.0
-export(float) var nPreviewFuelBurnRate = 5.5
+export(float) var nPreviewFuelBurnRate = 3.5
 export(int) var nGravityPreviewSteps = 360
 export(float) var nGravityPreviewDelta = 0.05
 export(float) var nPreviewLaunchSpeed = 140.0
@@ -61,6 +61,25 @@ func GetRouteLength() -> float:
 func GetFuelRange() -> float:
     return nCurrentFuelRange
 
+func IsDraggingRoute() -> bool:
+    return nDraggedHandle != RouteHandle.NONE
+
+func _GetEditFuelRange() -> float:
+    if nCurrentFuelRange > 0.0:
+        return nCurrentFuelRange
+    if bEditingEnabled:
+        return nMaxRouteLengthAtFullFuel
+    return 0.0
+
+func _GetPreviewFuelAmount() -> float:
+    if nPreviewFuel > 0.0:
+        return nPreviewFuel
+    if bEditingEnabled and pShip != null and is_instance_valid(pShip):
+        if pShip.has_method("GetMaxFuelForRoutePlanning"):
+            return pShip.GetMaxFuelForRoutePlanning()
+        return pShip.GetMaxFuel()
+    return 0.0
+
 func SetStartPosition(vPos: Vector2) -> void:
     SyncStartFromShip(vPos)
 
@@ -105,11 +124,16 @@ func GetGravityAcceleration(vWorldPos: Vector2) -> Vector2:
     return vAcceleration
 
 func GetEditHint() -> String:
+    var nEditRange = _GetEditFuelRange()
     if bHasRoute:
+        if nCurrentFuelRange <= 0.0:
+            return "Drag direction handle. Refuel before launch."
         return "Drag direction handle. Range is limited by current fuel."
-    if nCurrentFuelRange <= 0.0:
+    if nEditRange <= 0.0:
         return "Need fuel before plotting a course."
-    return "Click to set launch direction (max range: %d)." % int(nCurrentFuelRange)
+    if nCurrentFuelRange <= 0.0:
+        return "Click to set direction (preview range %d, refuel to launch)." % int(nEditRange)
+    return "Click to set launch direction (max range: %d)." % int(nEditRange)
 
 func GetPositionAt(t: float) -> Vector2:
     if not bHasRoute:
@@ -150,7 +174,7 @@ func _unhandled_input(event: InputEvent) -> void:
         if not oEditBounds.has_point(vRawMouse):
             return
 
-        if nCurrentFuelRange <= 0.0:
+        if _GetEditFuelRange() <= 0.0:
             return
 
         if bHasRoute and _FindHandleAt(vMouse) != RouteHandle.NONE:
@@ -178,13 +202,14 @@ func _SetDirectionHandle(vPos: Vector2) -> void:
     emit_signal("RouteChanged")
 
 func _ClampDirectionToFuelRange(vPos: Vector2) -> Vector2:
-    if nCurrentFuelRange <= 0.0:
+    var nEditRange = _GetEditFuelRange()
+    if nEditRange <= 0.0:
         return vPos
     var vDelta = vPos - vStart
     var nDist = vDelta.length()
-    if nDist <= nCurrentFuelRange or nDist <= 0.001:
+    if nDist <= nEditRange or nDist <= 0.001:
         return vPos
-    return vStart + vDelta.normalized() * nCurrentFuelRange
+    return vStart + vDelta.normalized() * nEditRange
 
 func _FindHandleAt(vPos: Vector2) -> int:
     var nGrabRadius = nHandleRadius + 6.0
@@ -199,9 +224,12 @@ func _ClampToEditBounds(vPos: Vector2) -> Vector2:
     )
 
 func _draw() -> void:
-    if nCurrentFuelRange > 0.0 and bEditingEnabled:
-        draw_arc(vStart, nCurrentFuelRange, 0.0, TAU, 72, Color(0.35, 0.85, 1.0, 0.12), 1.5, true)
-        draw_arc(vStart, nCurrentFuelRange, 0.0, TAU, 72, Color(0.35, 0.85, 1.0, 0.35), 1.0, true)
+    var nEditRange = _GetEditFuelRange()
+    if nEditRange > 0.0 and bEditingEnabled:
+        var oRangeFill = Color(0.35, 0.85, 1.0, 0.12 if nCurrentFuelRange > 0.0 else 0.08)
+        var oRangeLine = Color(0.35, 0.85, 1.0, 0.35 if nCurrentFuelRange > 0.0 else 0.22)
+        draw_arc(vStart, nEditRange, 0.0, TAU, 72, oRangeFill, 1.5, true)
+        draw_arc(vStart, nEditRange, 0.0, TAU, 72, oRangeLine, 1.0, true)
 
     if not bHasRoute:
         return
@@ -220,7 +248,7 @@ func _BuildGravityPreview() -> PoolVector2Array:
     var vPoints = PoolVector2Array()
     var vPos = vStart
     var vVelocity = GetDirection() * nPreviewLaunchSpeed
-    var nFuelLeft = nPreviewFuel
+    var nFuelLeft = _GetPreviewFuelAmount()
     vPoints.append(vPos)
 
     for i in range(nGravityPreviewSteps):

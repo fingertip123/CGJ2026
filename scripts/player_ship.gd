@@ -20,7 +20,8 @@ export(float) var nBaseLaunchSpeed = 85.0
 export(float) var nMaxFlightTime = 40.0
 export(float) var nMaxFuel = 80.0
 export(float) var nStartFuel = 22.0
-export(float) var nFuelBurnRate = 5.5
+export(float) var nLaunchFuelCost = 8.0
+export(float) var nFuelBurnRate = 3.5
 export(float) var nDistancePerFuel = 13.0
 export(float) var nAnchorBrakeDecel = 100.0
 export(float) var nAnchorBrakeStopSpeed = 6.0
@@ -56,6 +57,13 @@ var bTethered = false
 var pTetherPlanet = null
 var vTetherLocalOffset = Vector2.ZERO
 var nTetherLength = 0.0
+var bStunned = false
+var nStunTimer = 0.0
+var bBaseShockSlowdown = false
+var vShockSourceBases = []
+var nStunRingBlinkPhase = 0.0
+var nBaseShockStunDuration = 1.5
+var nBaseShockSpeedCap = 10.0
 
 func Setup(pRouteManager, pGameNode) -> void:
     pRoute = pRouteManager
@@ -69,6 +77,9 @@ func Setup(pRouteManager, pGameNode) -> void:
     bBraking = false
     bCoasting = false
     bFuelDepletedNotified = false
+    _ClearBaseShockState()
+    nBaseShockStunDuration = UnitData.GetEnemyBaseShockStunDuration()
+    nBaseShockSpeedCap = UnitData.GetEnemyBaseShockSpeedCap()
     nFlightTime = 0.0
     vVelocity = Vector2.ZERO
     vHeading = Vector2.RIGHT
@@ -76,17 +87,17 @@ func Setup(pRouteManager, pGameNode) -> void:
     _UpdateThruster()
     update()
 
-func _ready() -> void:
-    _SyncCollisionShape()
+func _ClearBaseShockState() -> void:
+    bStunned = false
+    nStunTimer = 0.0
+    bBaseShockSlowdown = false
+    vShockSourceBases.clear()
+    nStunRingBlinkPhase = 0.0
 
-func _SyncCollisionShape() -> void:
-    if pCollisionShape == null:
-        return
-    var pShape = pCollisionShape.shape
-    if pShape == null or not (pShape is CircleShape2D):
-        pShape = CircleShape2D.new()
-        pCollisionShape.shape = pShape
-    pShape.radius = nShipCollisionRadius
+func _ready() -> void:
+    nBaseShockStunDuration = UnitData.GetEnemyBaseShockStunDuration()
+    nBaseShockSpeedCap = UnitData.GetEnemyBaseShockSpeedCap()
+    _SyncCollisionShape()
 
 func ResetPathProgress() -> void:
     nPathT = 0.0
@@ -95,6 +106,9 @@ func ResetPathProgress() -> void:
     bBraking = false
     bCoasting = false
     bFuelDepletedNotified = false
+    _ClearBaseShockState()
+    nBaseShockStunDuration = UnitData.GetEnemyBaseShockStunDuration()
+    nBaseShockSpeedCap = UnitData.GetEnemyBaseShockSpeedCap()
     nFlightTime = 0.0
     vVelocity = Vector2.ZERO
     vHeading = Vector2.RIGHT
@@ -110,6 +124,9 @@ func ResetFlightState() -> void:
     bBraking = false
     bCoasting = false
     bFuelDepletedNotified = false
+    _ClearBaseShockState()
+    nBaseShockStunDuration = UnitData.GetEnemyBaseShockStunDuration()
+    nBaseShockSpeedCap = UnitData.GetEnemyBaseShockSpeedCap()
     nFlightTime = 0.0
     vVelocity = Vector2.ZERO
     vHeading = Vector2.RIGHT
@@ -124,6 +141,15 @@ func UpdateSpawnPosition() -> void:
     vSpawnPosition = global_position
     update()
 
+func _SyncCollisionShape() -> void:
+    if pCollisionShape == null:
+        return
+    var pShape = pCollisionShape.shape
+    if pShape == null or not (pShape is CircleShape2D):
+        pShape = CircleShape2D.new()
+        pCollisionShape.shape = pShape
+    pShape.radius = nShipCollisionRadius
+
 func SetCameraActive(bActive: bool) -> void:
     if pCamera == null:
         return
@@ -134,6 +160,18 @@ func SetLaunchSpeed(nValue: float) -> void:
 
 func GetEffectiveFuelBurnRate() -> float:
     return nFuelBurnRate * (nLaunchSpeed / max(nBaseLaunchSpeed, 0.001))
+
+func GetLaunchFuelCost() -> float:
+    return max(0.0, nLaunchFuelCost)
+
+func GetFuelForRoutePlanning() -> float:
+    return max(0.0, nFuel - GetLaunchFuelCost())
+
+func GetMaxFuelForRoutePlanning() -> float:
+    return max(0.0, nMaxFuel - GetLaunchFuelCost())
+
+func CanAffordLaunch() -> bool:
+    return nFuel >= GetLaunchFuelCost() + 0.001
 
 func GetVelocity() -> Vector2:
     return vVelocity
@@ -167,6 +205,67 @@ func GetFuelRatio() -> float:
 
 func IsCoasting() -> bool:
     return bCoasting
+
+func IsStunned() -> bool:
+    return bStunned
+
+func IsBaseShockSlowdown() -> bool:
+    return bBaseShockSlowdown
+
+func ApplyBaseShock(pSourceBase = null) -> void:
+    if not bMoving:
+        return
+    if pSourceBase != null and is_instance_valid(pSourceBase) and vShockSourceBases.find(pSourceBase) < 0:
+        vShockSourceBases.append(pSourceBase)
+    bBaseShockSlowdown = true
+    bStunned = true
+    nStunTimer = nBaseShockStunDuration
+    bHasThrust = false
+    bBraking = false
+    bCoasting = false
+    _ApplyBaseShockSpeedCap()
+    _UpdateHeading()
+    _UpdateThruster()
+    update()
+
+func OnShockSourceBaseDestroyed(pSourceBase) -> void:
+    if pSourceBase == null:
+        return
+    vShockSourceBases.erase(pSourceBase)
+    if vShockSourceBases.empty():
+        ReleaseBaseShockSlowdown()
+
+func ReleaseBaseShockSlowdown() -> void:
+    if not bBaseShockSlowdown and not bStunned:
+        return
+    _ClearBaseShockState()
+    if bMoving and HasFuel() and not bBraking:
+        bHasThrust = true
+        bCoasting = false
+    _UpdateThruster()
+    update()
+
+func _ApplyBaseShockSpeedCap() -> void:
+    if not bBaseShockSlowdown:
+        return
+    if vVelocity.length_squared() > 0.001:
+        vVelocity = vVelocity.normalized() * min(vVelocity.length(), nBaseShockSpeedCap)
+        vHeading = vVelocity.normalized()
+    else:
+        vVelocity = vHeading * nBaseShockSpeedCap
+
+func _ProcessStunMovement(delta: float) -> void:
+    nStunTimer -= delta
+    _ApplyBaseShockSpeedCap()
+    _MoveWithPlanetCollision(vVelocity * delta)
+    _ResolvePlanetOverlaps()
+    _UpdateHeading()
+    if nStunTimer <= 0.0:
+        bStunned = false
+        bCoasting = true
+        bHasThrust = false
+        _ApplyBaseShockSpeedCap()
+        _UpdateThruster()
 
 func HasFuel() -> bool:
     return nFuel > 0.001
@@ -229,8 +328,9 @@ func _ApplyShipVisual() -> void:
 func StartMarch() -> void:
     if pRoute != null and pRoute.has_method("HasRoute") and not pRoute.HasRoute():
         return
-    if not HasFuel():
+    if not CanAffordLaunch():
         return
+    ConsumeFuel(GetLaunchFuelCost())
     nPathT = 0.0
     nFlightTime = 0.0
     vVelocity = pRoute.GetDirection() * nLaunchSpeed if pRoute != null and pRoute.has_method("GetDirection") else Vector2.RIGHT * nLaunchSpeed
@@ -246,6 +346,7 @@ func StopMarch() -> void:
     bHasThrust = false
     bBraking = false
     bCoasting = false
+    _ClearBaseShockState()
     vVelocity = Vector2.ZERO
     vHeading = Vector2.RIGHT
     ReleaseTether()
@@ -329,14 +430,15 @@ func _BeginCoast() -> void:
     bCoasting = true
 
 func _ProcessCoastDecel(delta: float) -> void:
+    var nTargetMinSpeed = nBaseShockSpeedCap if bBaseShockSlowdown else nCoastMinSpeed
     var nSpeed = vVelocity.length()
     if nSpeed <= 0.001:
-        vVelocity = vHeading * nCoastMinSpeed
+        vVelocity = vHeading * nTargetMinSpeed
         return
-    if nSpeed <= nCoastMinSpeed:
-        vVelocity = vVelocity.normalized() * nCoastMinSpeed
+    if nSpeed <= nTargetMinSpeed:
+        vVelocity = vVelocity.normalized() * nTargetMinSpeed
         return
-    var nDecel = min(nCoastDecel * delta, nSpeed - nCoastMinSpeed)
+    var nDecel = min(nCoastDecel * delta, nSpeed - nTargetMinSpeed)
     vVelocity -= vVelocity.normalized() * nDecel
 
 func _UpdateThruster() -> void:
@@ -413,34 +515,48 @@ func _process(delta: float) -> void:
 
     if bMoving:
         nFlightTime += delta
-        if pRoute != null and pRoute.has_method("GetGravityAcceleration"):
-            vVelocity += pRoute.GetGravityAcceleration(global_position) * delta
-        if bBraking:
-            var nSpeed = vVelocity.length()
-            if nSpeed <= nAnchorBrakeStopSpeed:
-                _FinishAnchorBrake()
-            else:
-                var nDecel = min(nAnchorBrakeDecel * delta, nSpeed)
-                vVelocity -= vVelocity.normalized() * nDecel
-        elif bHasThrust:
-            if HasFuel():
-                ConsumeFuel(GetEffectiveFuelBurnRate() * delta)
-            if not HasFuel():
+        if bStunned:
+            _ProcessStunMovement(delta)
+        else:
+            if bBaseShockSlowdown:
                 bHasThrust = false
-                if not bFuelDepletedNotified:
-                    bFuelDepletedNotified = true
-                    emit_signal("FuelDepleted")
-                _BeginCoast()
-        elif bCoasting:
-            _ProcessCoastDecel(delta)
-        _MoveWithPlanetCollision(vVelocity * delta)
-        _ResolvePlanetOverlaps()
+                if not bBraking:
+                    bCoasting = true
+            if pRoute != null and pRoute.has_method("GetGravityAcceleration"):
+                vVelocity += pRoute.GetGravityAcceleration(global_position) * delta
+            if bBraking:
+                var nSpeed = vVelocity.length()
+                if nSpeed <= nAnchorBrakeStopSpeed:
+                    _FinishAnchorBrake()
+                else:
+                    var nDecel = min(nAnchorBrakeDecel * delta, nSpeed)
+                    vVelocity -= vVelocity.normalized() * nDecel
+            elif bHasThrust:
+                if HasFuel():
+                    ConsumeFuel(GetEffectiveFuelBurnRate() * delta)
+                if not HasFuel():
+                    bHasThrust = false
+                    if not bFuelDepletedNotified:
+                        bFuelDepletedNotified = true
+                        emit_signal("FuelDepleted")
+                    _BeginCoast()
+            elif bCoasting:
+                _ProcessCoastDecel(delta)
+            _MoveWithPlanetCollision(vVelocity * delta)
+            _ResolvePlanetOverlaps()
+            if bBaseShockSlowdown:
+                _ApplyBaseShockSpeedCap()
+            _UpdateHeading()
         nPathT = clamp(nFlightTime / max(nMaxFlightTime, 0.001), 0.0, 1.0)
-        _UpdateHeading()
+        if pGame != null and pGame.has_method("CheckEnemyBaseShock"):
+            pGame.CheckEnemyBaseShock()
+
+    if bBaseShockSlowdown:
+        nStunRingBlinkPhase += delta * 7.0
 
     _UpdateThruster()
 
-    if pGame != null and pGame.IsMarchRunning():
+    if pGame != null and pGame.IsMarchRunning() and not bStunned:
         nAttackCooldown -= delta
         if nAttackCooldown <= 0.0:
             var pTarget = pGame.GetNearestHostileInRange(global_position, nAttackRange)
@@ -452,6 +568,21 @@ func _process(delta: float) -> void:
 
 func _draw() -> void:
     _DrawGrappleChain()
+
+    if bBaseShockSlowdown:
+        var bRingVisible = int(nStunRingBlinkPhase) % 2 == 0
+        if bRingVisible:
+            var nPulse = 0.45 + 0.35 * abs(sin(nStunRingBlinkPhase * PI))
+            draw_arc(
+                Vector2.ZERO,
+                nAnchorRadius + 8.0,
+                0.0,
+                TAU,
+                48,
+                Color(0.95, 0.35, 0.95, nPulse),
+                3.0,
+                true
+            )
 
     draw_circle(Vector2.ZERO, nAnchorRadius, Color(0.2, 0.75, 1.0, 0.08))
     draw_arc(Vector2.ZERO, nAnchorRadius, 0.0, TAU, 64, Color(0.35, 0.85, 1.0, 0.45), 2.0, true)

@@ -11,6 +11,7 @@ var nDamage = 10.0
 var nAttackRange = 50.0
 var nAttackInterval = 0.5
 var nMoveSpeed = 90.0
+var nCatchUpSpeedMax = 420.0
 var nOrbitSpeed = 1.5
 var nOrbitRadius = 60.0
 var bTaunt = false
@@ -105,18 +106,25 @@ func _GetOrbitPosition() -> Vector2:
     return _ClampToAnchorZone(pShip.global_position + vDir * nOrbitRadius)
 
 func _OrbitPatrol(delta: float, nSpeedScale: float = 1.0) -> void:
-    _MoveTowards(_GetOrbitPosition(), delta, nMoveSpeed * nSpeedScale)
+    var vTarget = _GetOrbitPosition()
+    _MoveTowards(vTarget, delta, _GetCatchUpSpeed(vTarget) * nSpeedScale)
+
+func _GetCatchUpSpeed(vTarget: Vector2) -> float:
+    var nDist = global_position.distance_to(vTarget)
+    var nShipSpeed = pShip.GetVelocity().length() if pShip.has_method("GetVelocity") else 0.0
+    var nSpeed = nMoveSpeed + nShipSpeed * 1.2
+    if nDist > nOrbitRadius * 0.4:
+        nSpeed += (nDist - nOrbitRadius * 0.4) * 2.0
+    var nSpeedCap = max(nMoveSpeed * 2.8, nShipSpeed * 1.8 + 140.0)
+    return clamp(nSpeed, nMoveSpeed, min(nCatchUpSpeedMax, nSpeedCap))
 
 func _MoveTowards(vTarget: Vector2, delta: float, nSpeed: float) -> void:
     var vToTarget = vTarget - global_position
     var nDist = vToTarget.length()
     if nDist <= 0.001:
         return
-    var nStep = nSpeed * delta
-    if nStep >= nDist:
-        global_position = vTarget
-    else:
-        global_position += vToTarget.normalized() * nStep
+    var nStep = min(nSpeed * delta, nDist)
+    global_position += vToTarget.normalized() * nStep
     _FaceTarget(vToTarget)
 
 func _SeekAndAttack(pTarget, delta: float) -> void:
@@ -129,11 +137,14 @@ func _SeekAndAttack(pTarget, delta: float) -> void:
         if nCooldown <= 0.0:
             nCooldown = nAttackInterval
             _FireMissile(pTarget, vToTarget)
-        _OrbitPatrol(delta, 0.3)
+        _OrbitPatrol(delta, 0.45)
         return
 
-    var vNext = global_position + vToTarget.normalized() * nMoveSpeed * delta
-    global_position = _ClampToAnchorZone(vNext)
+    var vMoveTarget = pTarget.global_position
+    var nDistFromShip = global_position.distance_to(pShip.global_position)
+    if nDistFromShip > pShip.nAnchorRadius * 0.9:
+        vMoveTarget = _GetOrbitPosition()
+    _MoveTowards(vMoveTarget, delta, _GetCatchUpSpeed(vMoveTarget))
 
 func _FaceTarget(vToTarget: Vector2) -> void:
     if pSprite == null or vToTarget.length_squared() <= 0.001:

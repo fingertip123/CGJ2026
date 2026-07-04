@@ -19,6 +19,7 @@ var vPatrolOrigin = Vector2.ZERO
 var pGame = null
 var bActive = true
 var bShipInAlertRange = false
+var nShockPulseTimer = 0.0
 var vGuards = []
 
 onready var pSprite = $Sprite
@@ -124,6 +125,10 @@ func _ApplySprite() -> void:
 func IsShipInAlertRange() -> bool:
     return bShipInAlertRange
 
+func PlayShockPulse() -> void:
+    nShockPulseTimer = 0.45
+    update()
+
 func TakeDamage(nAmount: float) -> void:
     if not bActive:
         return
@@ -147,6 +152,9 @@ func _process(delta: float) -> void:
     if not bActive:
         return
 
+    if nShockPulseTimer > 0.0:
+        nShockPulseTimer = max(0.0, nShockPulseTimer - delta)
+
     nPatrolPhase += delta * (nPatrolSpeed / max(nPatrolRadius, 1.0))
     global_position = vPatrolOrigin + Vector2(cos(nPatrolPhase), sin(nPatrolPhase * 0.82)) * nPatrolRadius
 
@@ -163,6 +171,12 @@ func _draw() -> void:
 
     if bShipInAlertRange:
         draw_arc(Vector2.ZERO, nAlertRadius, 0.0, TAU, 72, Color(0.95, 0.35, 0.25, 0.55), 3.0, true)
+
+    if nShockPulseTimer > 0.0:
+        var nPulse = 1.0 - (nShockPulseTimer / 0.45)
+        var nPulseRadius = nAlertRadius * (1.0 + nPulse * 0.12)
+        var oPulseColor = Color(0.95, 0.45, 0.95, 0.35 * (1.0 - nPulse))
+        draw_arc(Vector2.ZERO, nPulseRadius, 0.0, TAU, 72, oPulseColor, 4.0, true)
 
     var nRatio = GetHpRatio()
     var vBar = Vector2(-nBodyRadius, -nBodyRadius - 16.0)
