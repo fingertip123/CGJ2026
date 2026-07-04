@@ -53,7 +53,7 @@ func _process(delta: float) -> void:
 func _GetSpawnBurstCount() -> int:
     var nProgress = clamp(nCombatTime / max(nSpawnAccelDuration, 0.001), 0.0, 1.0)
     var nBurst = nSpawnBurstMin + int(round(nProgress * float(nSpawnBurstMax - nSpawnBurstMin)))
-    return clamp(nBurst, nSpawnBurstMin, nSpawnBurstMax)
+    return int(clamp(nBurst, nSpawnBurstMin, nSpawnBurstMax))
 
 func _GetSpawnInterval() -> float:
     var nBase = nSpawnInterval * pGame.GetSpawnIntervalMultiplier()
