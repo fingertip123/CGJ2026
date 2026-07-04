@@ -222,6 +222,26 @@ func GetDroneMaxCount() -> int:
 func GetMiningDroneMaxCount() -> int:
     return pShip.GetMiningDroneMaxCount()
 
+func _IsEscortDroneAlive(pDrone) -> bool:
+    if pDrone == null or not is_instance_valid(pDrone):
+        return false
+    if not pDrone.bActive:
+        return false
+    if pDrone.has_method("GetHpRatio") and pDrone.GetHpRatio() <= 0.0:
+        return false
+    return true
+
+func _PruneInvalidDrones() -> void:
+    var vAlive = []
+    for pDrone in vDrones:
+        if _IsEscortDroneAlive(pDrone):
+            vAlive.append(pDrone)
+    vDrones = vAlive
+
+func GetAliveDroneCount() -> int:
+    _PruneInvalidDrones()
+    return vDrones.size()
+
 func GetAliveMonsterCount() -> int:
     var nCount = 0
     for pMonster in vMonsters:
@@ -620,7 +640,7 @@ func _CanUseCard(oCard: Dictionary) -> bool:
         return false
     if oCard.get("kind", UnitData.CardKind.ESCORT) == UnitData.CardKind.MINING:
         return vMiningDrones.size() < GetMiningDroneMaxCount()
-    return vDrones.size() < GetDroneMaxCount()
+    return GetAliveDroneCount() < GetDroneMaxCount()
 
 func _TryUseCard(nIndex: int) -> void:
     if nPhase == GamePhase.WIN or nPhase == GamePhase.LOSE:
@@ -641,6 +661,9 @@ func _TryUseCard(nIndex: int) -> void:
     _UpdateUi()
 
 func _SpawnDrone(nType: int) -> void:
+    _PruneInvalidDrones()
+    if GetAliveDroneCount() >= GetDroneMaxCount():
+        return
     var pDrone = DroneEscortScene.instance()
     pDroneRoot.add_child(pDrone)
     pDrone.connect("Died", self, "_OnDroneDied")
@@ -689,6 +712,7 @@ func _OnEnemyBaseDied(pBase) -> void:
 
 func _OnDroneDied(pDrone) -> void:
     vDrones.erase(pDrone)
+    _PruneInvalidDrones()
     if is_instance_valid(pDrone):
         pDrone.queue_free()
     _UpdateUi()
@@ -982,7 +1006,7 @@ func _UpdateUi() -> void:
 
     pStatsLabel.text = "LV.%d  HP %d  FUEL %d/%d  GOLD %d\nESCORT %d/%d  MINING %d/%d  KILLS %d  POS (%d,%d)" % [
         pShip.nLevel, int(pShip.nHp), int(pShip.GetFuel()), int(pShip.GetMaxFuel()), nGold,
-        vDrones.size(), GetDroneMaxCount(), vMiningDrones.size(), GetMiningDroneMaxCount(), nMonstersKilled,
+        GetAliveDroneCount(), GetDroneMaxCount(), vMiningDrones.size(), GetMiningDroneMaxCount(), nMonstersKilled,
         int(round(pShip.global_position.x)), int(round(pShip.global_position.y))
     ]
     pSpeedLabel.text = "Launch Speed  %d" % int(round(pShip.nLaunchSpeed))
@@ -1001,7 +1025,7 @@ func _UpdateUi() -> void:
         pShip.nLevel,
         pShip.GetUpgradeCost(),
         pShip.CanUpgrade(),
-        vDrones.size(),
+        GetAliveDroneCount(),
         GetDroneMaxCount(),
         vMiningDrones.size(),
         GetMiningDroneMaxCount()
