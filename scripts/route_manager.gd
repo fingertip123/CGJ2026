@@ -62,10 +62,16 @@ func GetFuelRange() -> float:
     return nCurrentFuelRange
 
 func SetStartPosition(vPos: Vector2) -> void:
-    var vClamped = _ClampToEditBounds(vPos)
-    if vStart.distance_to(vClamped) < 0.01:
+    SyncStartFromShip(vPos)
+
+func SyncStartFromShip(vPos: Vector2) -> void:
+    var vDelta = vPos - vStart
+    if vDelta.length_squared() <= 0.001:
         return
-    vStart = vClamped
+    vStart = vPos
+    if bHasRoute:
+        vDirectionHandle += vDelta
+        vDirectionHandle = _ClampDirectionToFuelRange(vDirectionHandle)
     update()
 
 func SetEditingEnabled(bEnabled: bool) -> void:

@@ -6,11 +6,13 @@ export(float) var nMapPadding = 10.0
 var pShip = null
 var pAnchor = null
 var pPlanetsRoot = null
+var pEnemyBasesRoot = null
 
-func Setup(pShipNode, pAnchorNode, pPlanetsRootNode, oBounds: Rect2 = Rect2()) -> void:
+func Setup(pShipNode, pAnchorNode, pPlanetsRootNode, oBounds: Rect2 = Rect2(), pEnemyBasesRootNode = null) -> void:
     pShip = pShipNode
     pAnchor = pAnchorNode
     pPlanetsRoot = pPlanetsRootNode
+    pEnemyBasesRoot = pEnemyBasesRootNode
     if oBounds.size != Vector2.ZERO:
         oWorldBounds = oBounds
     else:
@@ -42,6 +44,17 @@ func _AutoFitBounds() -> void:
             if pPlanet == null or not is_instance_valid(pPlanet):
                 continue
             var vPos = pPlanet.global_position
+            if not bHasPoint:
+                oBounds = Rect2(vPos, Vector2.ZERO)
+                bHasPoint = true
+            else:
+                oBounds = oBounds.expand(vPos)
+
+    if pEnemyBasesRoot != null and is_instance_valid(pEnemyBasesRoot):
+        for pBase in pEnemyBasesRoot.get_children():
+            if pBase == null or not is_instance_valid(pBase):
+                continue
+            var vPos = pBase.global_position
             if not bHasPoint:
                 oBounds = Rect2(vPos, Vector2.ZERO)
                 bHasPoint = true
@@ -102,6 +115,7 @@ func _draw() -> void:
     draw_rect(Rect2(vWorldRectPos, vWorldRectEnd - vWorldRectPos), Color(0.12, 0.16, 0.24, 0.35), false, 1.0)
 
     _DrawPlanets()
+    _DrawEnemyBases()
     _DrawAnchor()
     _DrawShip()
 
@@ -126,6 +140,24 @@ func _DrawPlanets() -> void:
         draw_circle(vPos, nGravityMapRadius, Color(0.35, 0.55, 0.95, 0.12))
         draw_circle(vPos, nPlanetMapRadius, Color(0.45, 0.55, 0.95, 0.95))
         draw_arc(vPos, nPlanetMapRadius, 0.0, TAU, 16, Color(0.75, 0.85, 1.0, 0.8), 1.0, true)
+
+func _DrawEnemyBases() -> void:
+    if pEnemyBasesRoot == null or not is_instance_valid(pEnemyBasesRoot):
+        return
+
+    for pBase in pEnemyBasesRoot.get_children():
+        if pBase == null or not is_instance_valid(pBase) or not pBase.bActive:
+            continue
+
+        var vPos = _WorldToMap(pBase.global_position)
+        var nAlertRadius = pBase.nAlertRadius if "nAlertRadius" in pBase else 250.0
+        var nBodyRadius = pBase.nBodyRadius if "nBodyRadius" in pBase else 52.0
+        var nAlertMapRadius = max(3.0, _WorldDistanceToMap(nAlertRadius))
+        var nBodyMapRadius = max(3.0, _WorldDistanceToMap(nBodyRadius))
+
+        draw_circle(vPos, nAlertMapRadius, Color(0.95, 0.3, 0.22, 0.1))
+        draw_arc(vPos, nAlertMapRadius, 0.0, TAU, 24, Color(0.95, 0.35, 0.25, 0.45), 1.0, true)
+        draw_circle(vPos, nBodyMapRadius, Color(0.85, 0.25, 0.2, 0.95))
 
 func _DrawAnchor() -> void:
     if pAnchor == null or not is_instance_valid(pAnchor):

@@ -10,6 +10,7 @@ onready var pDroneRoot = $DroneRoot
 onready var pMiningDroneRoot = $MiningDroneRoot
 onready var pMonsterRoot = $MonsterRoot
 onready var pPlanetsRoot = $Planets
+onready var pEnemyBasesRoot = $EnemyBases
 onready var pCardPool = $UiLayer/CardPool
 onready var pPhaseLabel = $UiLayer/Panel/VBox/PhaseLabel
 onready var pHintLabel = $UiLayer/Panel/VBox/HintLabel
@@ -45,6 +46,7 @@ var nGold = 60
 var nMonstersKilled = 0
 var nRefreshCooldown = 0.0
 var vMonsters = []
+var vEnemyBases = []
 var vDrones = []
 var vMiningDrones = []
 var vCards = []
@@ -83,11 +85,12 @@ func _ready() -> void:
     vParallaxOrigin = pShip.global_position
     _SetParallaxOffset(Vector2.ZERO)
     pAnchorIndicator.Setup(pAnchorPoint, pShip)
-    pMinimap.Setup(pShip, pAnchorPoint, pPlanetsRoot, pRoute.oEditBounds)
+    pMinimap.Setup(pShip, pAnchorPoint, pPlanetsRoot, pRoute.oEditBounds, pEnemyBasesRoot)
     _SetupMissileSfx()
     _SetupEnemyMissileSfx()
     _SetupShipPulseSfx()
     _SetupPlanets()
+    _SetupEnemyBases()
     pSpawnManager.Setup(self, pRoute, pShip)
     _SyncRouteFuelRange()
     _RollCardPool()
@@ -152,6 +155,19 @@ func GetAliveMonsterCount() -> int:
             nCount += 1
     return nCount
 
+func GetAlivePatrolMonsterCount() -> int:
+    var nCount = 0
+    for pMonster in vMonsters:
+        if pMonster == null or not is_instance_valid(pMonster) or not pMonster.bActive:
+            continue
+        if pMonster.get_parent() != pMonsterRoot:
+            continue
+        nCount += 1
+    return nCount
+
+func GetSpawnViewportSize() -> Vector2:
+    return Vector2(pRoute.oEditBounds.size.x, pRoute.oEditBounds.size.y)
+
 func GetNearestMonsterInRange(vPos: Vector2, nRange: float):
     var pBest = null
     var nBestDist = nRange
@@ -164,6 +180,27 @@ func GetNearestMonsterInRange(vPos: Vector2, nRange: float):
             pBest = pMonster
     return pBest
 
+func GetNearestHostileInRange(vPos: Vector2, nRange: float):
+    var pBest = GetNearestMonsterInRange(vPos, nRange)
+    var nBestDist = nRange
+    if pBest != null:
+        nBestDist = vPos.distance_to(pBest.global_position)
+    for pBase in vEnemyBases:
+        if pBase == null or not is_instance_valid(pBase) or not pBase.bActive:
+            continue
+        var nDist = vPos.distance_to(pBase.global_position)
+        if nDist <= nRange and nDist < nBestDist:
+            nBestDist = nDist
+            pBest = pBase
+    return pBest
+
+func _CanDetectHostile(pMonster, nDetectRadius: float) -> bool:
+    if pShip.global_position.distance_to(pMonster.global_position) <= nDetectRadius:
+        return true
+    if pMonster.has_method("IsAggroActive") and pMonster.IsAggroActive():
+        return true
+    return false
+
 func GetNearestMonsterInAnchorZone(vFrom: Vector2, nZoneRadius: float):
     var pBest = null
     var nBestDist = INF
@@ -171,12 +208,21 @@ func GetNearestMonsterInAnchorZone(vFrom: Vector2, nZoneRadius: float):
     for pMonster in vMonsters:
         if pMonster == null or not is_instance_valid(pMonster) or not pMonster.bActive:
             continue
-        if pShip.global_position.distance_to(pMonster.global_position) > nDetectRadius:
+        if not _CanDetectHostile(pMonster, nDetectRadius):
             continue
         var nDist = vFrom.distance_to(pMonster.global_position)
         if nDist < nBestDist:
             nBestDist = nDist
             pBest = pMonster
+    for pBase in vEnemyBases:
+        if pBase == null or not is_instance_valid(pBase) or not pBase.bActive:
+            continue
+        if not pBase.has_method("IsShipInAlertRange") or not pBase.IsShipInAlertRange():
+            continue
+        var nDist = vFrom.distance_to(pBase.global_position)
+        if nDist < nBestDist:
+            nBestDist = nDist
+            pBest = pBase
     return pBest
 
 func GetNearestMineablePlanet(vFrom: Vector2):
@@ -222,6 +268,11 @@ func AddMonster(pMonster, vPos: Vector2) -> void:
     pMonster.connect("Died", self, "_OnMonsterDied")
     pMonster.Setup(self)
     vMonsters.append(pMonster)
+
+func RegisterBaseGuard(pGuard) -> void:
+    if pGuard == null:
+        return
+    vMonsters.append(pGuard)
 
 func SpawnMissile(vSpawnPos: Vector2, vDirection: Vector2, nDamage: float, pTarget) -> void:
     var pMissile = MissileScene.instance()
@@ -339,11 +390,22 @@ func _SetupPlanets() -> void:
         if pPlanet != null and is_instance_valid(pPlanet) and pPlanet.has_method("Setup"):
             pPlanet.Setup(self)
 
+func _SetupEnemyBases() -> void:
+    vEnemyBases.clear()
+    for pBase in pEnemyBasesRoot.get_children():
+        if pBase == null or not is_instance_valid(pBase):
+            continue
+        if not pBase.has_method("Setup"):
+            continue
+        pBase.connect("Died", self, "_OnEnemyBaseDied")
+        pBase.Setup(self)
+        vEnemyBases.append(pBase)
+
 func _SyncRouteFuelRange() -> void:
-    pRoute.SetFuelRange(pShip.GetFuel(), pShip.GetMaxFuel(), pShip.nFuelBurnRate)
+    pRoute.SetFuelRange(pShip.GetFuel(), pShip.GetMaxFuel(), pShip.GetEffectiveFuelBurnRate())
 
 func _SyncRouteStart() -> void:
-    pRoute.SetStartPosition(pShip.global_position)
+    pRoute.SyncStartFromShip(pShip.global_position)
 
 func _RollCardPool() -> void:
     vCards.clear()
@@ -416,6 +478,13 @@ func _OnMonsterDied(pMonster) -> void:
         pMonster.queue_free()
     _UpdateUi()
 
+func _OnEnemyBaseDied(pBase) -> void:
+    nGold += nKillGold * 4
+    vEnemyBases.erase(pBase)
+    if is_instance_valid(pBase):
+        pBase.queue_free()
+    _UpdateUi()
+
 func _OnDroneDied(pDrone) -> void:
     vDrones.erase(pDrone)
     if is_instance_valid(pDrone):
@@ -445,6 +514,9 @@ func _OnShipFuelDepleted() -> void:
 func _OnShipLevelChanged(nLevel: int) -> void:
     while vCards.size() < pShip.GetCardSlotCount():
         vCards.append(_GenerateSingleCard())
+    for pBase in vEnemyBases:
+        if pBase != null and is_instance_valid(pBase) and pBase.has_method("SyncHpFromShip"):
+            pBase.SyncHpFromShip()
     _UpdateUi()
 
 func _OnStartPressed() -> void:
@@ -482,6 +554,9 @@ func _OnUpgradePressed() -> void:
         return
     nGold -= nCost
     pShip.UpgradeLevel()
+    if nPhase == GamePhase.ANCHOR or nPhase == GamePhase.ANCHOR_PLAN:
+        _SyncRouteStart()
+        _SyncRouteFuelRange()
     _UpdateUi()
 
 func _OnSpeedSliderChanged(nValue: float) -> void:
@@ -495,6 +570,7 @@ func _SetLaunchSpeed(nValue: float) -> void:
     pRoute.SetPreviewLaunchSpeed(nClampedSpeed)
     if pSpeedSlider.value != nClampedSpeed:
         pSpeedSlider.value = nClampedSpeed
+    _SyncRouteFuelRange()
     _UpdateUi()
 
 func _OnRouteChanged() -> void:
@@ -509,6 +585,8 @@ func _OnRouteChanged() -> void:
 func _BeginMarch() -> void:
     pRoute.ResetPreviewTrim()
     pRoute.SetEditingEnabled(false)
+    _SyncRouteStart()
+    _SyncRouteFuelRange()
     pShip.StartMarch()
     pShip.SetCameraActive(true)
     vParallaxOrigin = pShip.global_position
@@ -584,7 +662,7 @@ func _UpdateUi() -> void:
         int(round(pShip.global_position.x)), int(round(pShip.global_position.y))
     ]
 
-    pSpeedLabel.text = "Launch Speed: %d" % int(round(pShip.nLaunchSpeed))
+    pSpeedLabel.text = "Ship Speed: %d  Fuel/s: %.1f" % [int(round(pShip.nLaunchSpeed)), pShip.GetEffectiveFuelBurnRate()]
     pSpeedSlider.editable = IsRoutePlanning()
 
     _UpdateActionButtons()
