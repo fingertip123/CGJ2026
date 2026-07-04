@@ -14,8 +14,11 @@ export(int) var nFuelDepositBase = 70 setget SetFuelDepositBase
 export(int) var nGoldDepositBase = 45 setget SetGoldDepositBase
 export(int) var nFuelDepositVariance = 20
 export(int) var nGoldDepositVariance = 15
+export(float) var nSpinSpeedMin = 0.12
+export(float) var nSpinSpeedMax = 0.48
 
 var pGame = null
+var nSpinSpeed = 0.0
 var nFuelRemaining = 0
 var nGoldRemaining = 0
 var bDepositsInitialized = false
@@ -49,9 +52,16 @@ func _ApplySprite() -> void:
 
 func Setup(pGameNode) -> void:
     pGame = pGameNode
+    _InitSpinSpeed()
     if not bDepositsInitialized:
         _InitDeposits()
     update()
+
+func _InitSpinSpeed() -> void:
+    if Engine.editor_hint:
+        return
+    var nMagnitude = rand_range(nSpinSpeedMin, nSpinSpeedMax)
+    nSpinSpeed = nMagnitude if randf() >= 0.5 else -nMagnitude
 
 func _InitDeposits() -> void:
     var nFuelMin = max(0, nFuelDepositBase - nFuelDepositVariance)
@@ -158,6 +168,8 @@ func GetCircularOrbitSpeed(nOrbitRadius: float) -> float:
     return sqrt(nPlanetMass / nRadius)
 
 func _process(delta: float) -> void:
+    if pSprite != null and nSpinSpeed != 0.0:
+        pSprite.rotation += nSpinSpeed * delta
     if pGravityRipples != null and pGravityRipples.Tick(delta):
         update()
 
