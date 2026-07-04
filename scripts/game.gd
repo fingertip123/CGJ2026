@@ -8,6 +8,7 @@ onready var pAnchorPoint = $AnchorPoint
 onready var pSpawnManager = $SpawnManager
 onready var pDroneRoot = $DroneRoot
 onready var pMonsterRoot = $MonsterRoot
+onready var pPlanetsRoot = $Planets
 onready var pCardPool = $UiLayer/CardPool
 onready var pPhaseLabel = $UiLayer/Panel/VBox/PhaseLabel
 onready var pHintLabel = $UiLayer/Panel/VBox/HintLabel
@@ -45,6 +46,9 @@ func _ready() -> void:
     pRoute.connect("RouteChanged", self, "_OnRouteChanged")
     pShip.Setup(pRoute, self)
     pRoute.SetStartPosition(pShip.global_position)
+    pRoute.SetPlanetsRoot(pPlanetsRoot)
+    pRoute.SetPreviewLaunchSpeed(pShip.nLaunchSpeed)
+    _SetupPlanets()
     pSpawnManager.Setup(self, pRoute, pShip)
     _RollCardPool()
     _SetPhase(GamePhase.PREP)
@@ -123,6 +127,11 @@ func AddMonster(pMonster, vPos: Vector2) -> void:
     pMonster.connect("Died", self, "_OnMonsterDied")
     pMonster.Setup(self)
     vMonsters.append(pMonster)
+
+func _SetupPlanets() -> void:
+    for pPlanet in pPlanetsRoot.get_children():
+        if pPlanet != null and is_instance_valid(pPlanet) and pPlanet.has_method("Setup"):
+            pPlanet.Setup(self)
 
 func _RollCardPool() -> void:
     vCards.clear()

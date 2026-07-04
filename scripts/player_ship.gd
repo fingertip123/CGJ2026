@@ -6,7 +6,8 @@ signal ReachedGoal
 signal Destroyed
 signal LevelChanged(nLevel)
 
-export(float) var nMoveSpeed = 0.035
+export(float) var nLaunchSpeed = 140.0
+export(float) var nMaxFlightTime = 18.0
 
 var nLevel = 1
 var nMaxHp = 500.0
@@ -18,6 +19,8 @@ var nAttackInterval = 0.55
 var nPathT = 0.0
 var bMoving = false
 var nAttackCooldown = 0.0
+var nFlightTime = 0.0
+var vVelocity = Vector2.ZERO
 var pRoute = null
 var pGame = null
 
@@ -27,6 +30,8 @@ func Setup(pRouteManager, pGameNode) -> void:
     _ApplyLevelStats(false)
     nPathT = 0.0
     bMoving = false
+    nFlightTime = 0.0
+    vVelocity = Vector2.ZERO
     if pRoute != null:
         position = pRoute.GetPositionAt(0.0)
     update()
@@ -34,6 +39,8 @@ func Setup(pRouteManager, pGameNode) -> void:
 func ResetPathProgress() -> void:
     nPathT = 0.0
     bMoving = false
+    nFlightTime = 0.0
+    vVelocity = Vector2.ZERO
     if pRoute != null:
         position = pRoute.GetPositionAt(0.0)
     update()
@@ -76,6 +83,9 @@ func _ApplyLevelStats(bKeepHpRatio: bool) -> void:
 func StartMarch() -> void:
     if pRoute != null and pRoute.has_method("HasRoute") and not pRoute.HasRoute():
         return
+    nPathT = 0.0
+    nFlightTime = 0.0
+    vVelocity = pRoute.GetDirection() * nLaunchSpeed if pRoute != null and pRoute.has_method("GetDirection") else Vector2.RIGHT * nLaunchSpeed
     bMoving = true
 
 func StopMarch() -> void:
@@ -98,13 +108,13 @@ func GetHpRatio() -> float:
 
 func _process(delta: float) -> void:
     if bMoving and pRoute != null and (not pRoute.has_method("HasRoute") or pRoute.HasRoute()):
-        nPathT += nMoveSpeed * delta
-        if nPathT >= 1.0:
-            nPathT = 1.0
-            position = pRoute.GetPositionAt(1.0)
+        nFlightTime += delta
+        if pRoute.has_method("GetGravityAcceleration"):
+            vVelocity += pRoute.GetGravityAcceleration(global_position) * delta
+        global_position += vVelocity * delta
+        nPathT = clamp(nFlightTime / max(nMaxFlightTime, 0.001), 0.0, 1.0)
+        if nFlightTime >= nMaxFlightTime:
             bMoving = false
-        else:
-            position = pRoute.GetPositionAt(nPathT)
 
     if pGame != null and pGame.IsMarchRunning():
         nAttackCooldown -= delta

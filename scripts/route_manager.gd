@@ -6,6 +6,9 @@ export(Vector2) var vStart = Vector2(100, 500)
 export(Vector2) var vDirectionHandle = Vector2(260, 420)
 export(float) var nRouteLength = 1200.0
 export(int) var nPreviewSegments = 48
+export(int) var nGravityPreviewSteps = 360
+export(float) var nGravityPreviewDelta = 0.05
+export(float) var nPreviewLaunchSpeed = 140.0
 export(Rect2) var oEditBounds = Rect2(Vector2.ZERO, Vector2(1024, 490))
 export(float) var nHandleRadius = 12.0
 export(float) var nMinDirectionLength = 32.0
@@ -15,6 +18,15 @@ enum RouteHandle { NONE = -1, DIRECTION = 0 }
 var bHasRoute = false
 var bEditingEnabled = true
 var nDraggedHandle = RouteHandle.NONE
+var pPlanetsRoot = null
+
+func SetPlanetsRoot(pRoot) -> void:
+    pPlanetsRoot = pRoot
+    update()
+
+func SetPreviewLaunchSpeed(nValue: float) -> void:
+    nPreviewLaunchSpeed = nValue
+    update()
 
 func SetStartPosition(vPos: Vector2) -> void:
     vStart = _ClampToEditBounds(vPos)
@@ -40,6 +52,16 @@ func GetDirection() -> Vector2:
 
 func GetEndPosition() -> Vector2:
     return vStart + GetDirection() * nRouteLength
+
+func GetGravityAcceleration(vWorldPos: Vector2) -> Vector2:
+    var vAcceleration = Vector2.ZERO
+    if pPlanetsRoot == null or not is_instance_valid(pPlanetsRoot):
+        return vAcceleration
+
+    for pPlanet in pPlanetsRoot.get_children():
+        if pPlanet != null and is_instance_valid(pPlanet) and pPlanet.has_method("GetGravityAcceleration"):
+            vAcceleration += pPlanet.GetGravityAcceleration(vWorldPos)
+    return vAcceleration
 
 func GetEditHint() -> String:
     if bHasRoute:
@@ -125,7 +147,7 @@ func _draw() -> void:
         draw_circle(vStart, nHandleRadius, Color(0.35, 0.9, 0.45))
         return
 
-    var vPreview = _BuildPreviewLine()
+    var vPreview = _BuildGravityPreview()
     for i in range(vPreview.size() - 1):
         draw_line(vPreview[i], vPreview[i + 1], Color(0.35, 0.75, 0.95, 0.85), 4.0, true)
     _DrawDashedPolyline(vPreview, Color(0.92, 0.94, 0.96, 0.86), 2.0, 10.0, 14.0)
@@ -142,6 +164,23 @@ func _BuildPreviewLine() -> PoolVector2Array:
     for i in range(nPreviewSegments + 1):
         var t = float(i) / float(max(1, nPreviewSegments))
         vPoints.append(vStart.linear_interpolate(vEnd, t))
+    return vPoints
+
+func _BuildGravityPreview() -> PoolVector2Array:
+    var vPoints = PoolVector2Array()
+    var vPos = vStart
+    var vVelocity = GetDirection() * nPreviewLaunchSpeed
+    vPoints.append(vPos)
+
+    for i in range(nGravityPreviewSteps):
+        vVelocity += GetGravityAcceleration(vPos) * nGravityPreviewDelta
+        vPos += vVelocity * nGravityPreviewDelta
+        vPoints.append(vPos)
+        if not oEditBounds.has_point(vPos):
+            break
+
+    if vPoints.size() < 2:
+        return _BuildPreviewLine()
     return vPoints
 
 func _DrawDashedPolyline(vPoints, oColor: Color, nWidth: float, nDashLength: float, nDashGap: float) -> void:
