@@ -95,6 +95,7 @@ func StartMarch() -> void:
 
 func StopMarch() -> void:
     bMoving = false
+    vVelocity = Vector2.ZERO
 
 func GetVelocity() -> Vector2:
     return vVelocity

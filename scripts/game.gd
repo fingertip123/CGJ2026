@@ -202,8 +202,9 @@ func _OnDroneDied(pDrone) -> void:
     _UpdateUi()
 
 func _OnShipReachedGoal() -> void:
+    pShip.StopMarch()
     _SetPhase(GamePhase.WIN)
-    pResultLabel.text = "Anchor reached! Mission complete. Ship keeps drifting."
+    pResultLabel.text = "Anchor reached! Mission complete."
     pResultLabel.add_color_override("font_color", Color(0.45, 0.95, 0.55))
     _UpdateUi()
 
