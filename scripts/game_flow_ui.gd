@@ -49,6 +49,7 @@ func _ready() -> void:
     _SetupMusicPlayer(pLosePlayer, LoseMusic, false)
     _SetupMusicPlayer(pDangerPlayer, DangerMusic, true)
     set_process(true)
+    call_deferred("_EnterMaximized")
     ShowWelcome()
 
 func _process(delta: float) -> void:
@@ -123,6 +124,12 @@ func _OnStartPressed() -> void:
 
 func _OnResetPressed() -> void:
     emit_signal("ResetRequested")
+
+func _EnterMaximized() -> void:
+    if Engine.editor_hint:
+        return
+    OS.set_window_fullscreen(false)
+    OS.window_maximized = true
 
 func _PlayWelcome() -> void:
     if pWelcomePlayer.stream == null:

@@ -949,5 +949,12 @@ func _unhandled_input(event: InputEvent) -> void:
             return
 
     if event is InputEventKey and event.pressed and not event.echo:
+        if event.scancode == KEY_F11 or (event.scancode == KEY_ENTER and event.alt):
+            _ToggleFullscreen()
+            get_tree().set_input_as_handled()
+            return
         if event.scancode == KEY_R:
             _OnResetPressed()
+
+func _ToggleFullscreen() -> void:
+    OS.set_window_fullscreen(not OS.is_window_fullscreen())
