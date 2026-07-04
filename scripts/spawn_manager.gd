@@ -3,60 +3,82 @@ extends Node2D
 const MonsterScene = preload("res://scenes/Monster.tscn")
 
 export(float) var nSpawnInterval = 1.6
-export(float) var nSideDistance = 150.0
+export(float) var nMinSpawnInterval = 0.35
+export(float) var nSpawnAccelDuration = 180.0
+export(float) var nSpawnAccelMinScale = 0.32
+export(float) var nEdgePadding = 32.0
 export(int) var nMaxAlive = 18
 
 var pGame = null
 var pRoute = null
 var pBase = null
 var nTimer = 0.0
-var nSideToggle = 1
+var nCombatTime = 0.0
 var nSpawned = 0
 
 func Setup(pManager, pRouteManager, pBaseNode) -> void:
     pGame = pManager
     pRoute = pRouteManager
     pBase = pBaseNode
-    nTimer = 1.0
-    nSideToggle = 1
-    nSpawned = 0
+    Reset()
 
 func Reset() -> void:
     nTimer = 1.0
-    nSideToggle = 1
+    nCombatTime = 0.0
     nSpawned = 0
 
 func _process(delta: float) -> void:
     if pGame == null or not pGame.CanDroneAttack():
         return
-    if pBase == null or pRoute == null:
+    if pBase == null:
         return
-    if pGame.GetAliveMonsterCount() >= nMaxAlive:
+    if pGame.GetAlivePatrolMonsterCount() >= nMaxAlive:
         return
 
+    nCombatTime += delta
     nTimer -= delta
     if nTimer > 0.0:
         return
 
-    nTimer = nSpawnInterval * pGame.GetSpawnIntervalMultiplier()
+    nTimer = _GetSpawnInterval()
     _SpawnMonster()
     nSpawned += 1
 
+func _GetSpawnInterval() -> float:
+    var nBase = nSpawnInterval * pGame.GetSpawnIntervalMultiplier()
+    var nProgress = clamp(nCombatTime / max(nSpawnAccelDuration, 0.001), 0.0, 1.0)
+    var nScale = lerp(1.0, nSpawnAccelMinScale, nProgress)
+    return max(nMinSpawnInterval, nBase * nScale)
+
 func _SpawnMonster() -> void:
-    var vDir = Vector2.RIGHT
-    if pBase.has_method("GetVelocity") and pBase.GetVelocity().length_squared() > 1.0:
-        vDir = pBase.GetVelocity().normalized()
-    elif pRoute != null and pRoute.has_method("GetDirection"):
-        vDir = pRoute.GetDirection()
-
-    var vNormal = Vector2(-vDir.y, vDir.x)
-    if nSideToggle < 0:
-        vNormal *= -1.0
-
-    var vForwardOffset = vDir * rand_range(40.0, 120.0)
-    var vSideOffset = vNormal * (nSideDistance + rand_range(-20.0, 20.0))
-    var vPos = pBase.global_position + vForwardOffset + vSideOffset
-    nSideToggle *= -1
-
+    var vPos = _GetRandomEdgeSpawnPos()
     var pMonster = MonsterScene.instance()
     pGame.AddMonster(pMonster, vPos)
+
+func _GetRandomEdgeSpawnPos() -> Vector2:
+    var vViewport = pGame.GetSpawnViewportSize() if pGame.has_method("GetSpawnViewportSize") else Vector2(1600, 790)
+    var vCenter = pBase.global_position
+    var oScreen = Rect2(vCenter - vViewport * 0.5, vViewport)
+    var nEdge = randi() % 4
+
+    match nEdge:
+        0:
+            return Vector2(
+                rand_range(oScreen.position.x + nEdgePadding, oScreen.position.x + oScreen.size.x - nEdgePadding),
+                oScreen.position.y - nEdgePadding
+            )
+        1:
+            return Vector2(
+                oScreen.position.x + oScreen.size.x + nEdgePadding,
+                rand_range(oScreen.position.y + nEdgePadding, oScreen.position.y + oScreen.size.y - nEdgePadding)
+            )
+        2:
+            return Vector2(
+                rand_range(oScreen.position.x + nEdgePadding, oScreen.position.x + oScreen.size.x - nEdgePadding),
+                oScreen.position.y + oScreen.size.y + nEdgePadding
+            )
+        _:
+            return Vector2(
+                oScreen.position.x - nEdgePadding,
+                rand_range(oScreen.position.y + nEdgePadding, oScreen.position.y + oScreen.size.y - nEdgePadding)
+            )

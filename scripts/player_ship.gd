@@ -15,6 +15,7 @@ onready var pThrusterFlame = $ThrusterFlame
 onready var pCollisionShape = $CollisionShape2D
 
 export(float) var nLaunchSpeed = 85.0
+export(float) var nBaseLaunchSpeed = 85.0
 export(float) var nMaxFlightTime = 40.0
 export(float) var nMaxFuel = 80.0
 export(float) var nStartFuel = 22.0
@@ -113,6 +114,9 @@ func SetCameraActive(bActive: bool) -> void:
 
 func SetLaunchSpeed(nValue: float) -> void:
     nLaunchSpeed = max(1.0, nValue)
+
+func GetEffectiveFuelBurnRate() -> float:
+    return nFuelBurnRate * (nLaunchSpeed / max(nBaseLaunchSpeed, 0.001))
 
 func GetVelocity() -> Vector2:
     return vVelocity
@@ -321,7 +325,7 @@ func _process(delta: float) -> void:
                 vVelocity -= vVelocity.normalized() * nDecel
         elif bHasThrust:
             if HasFuel():
-                ConsumeFuel(nFuelBurnRate * delta)
+                ConsumeFuel(GetEffectiveFuelBurnRate() * delta)
             if not HasFuel():
                 bHasThrust = false
                 if not bFuelDepletedNotified:
@@ -337,7 +341,7 @@ func _process(delta: float) -> void:
     if pGame != null and pGame.IsMarchRunning():
         nAttackCooldown -= delta
         if nAttackCooldown <= 0.0:
-            var pTarget = pGame.GetNearestMonsterInRange(global_position, nAttackRange)
+            var pTarget = pGame.GetNearestHostileInRange(global_position, nAttackRange)
             if pTarget != null:
                 nAttackCooldown = nAttackInterval
                 _FirePulseMissile(pTarget)

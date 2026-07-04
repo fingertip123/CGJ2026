@@ -56,6 +56,18 @@ const ENEMY_DRONE_STATS = {
     "move_speed": 85.0,
 }
 
+const ENEMY_BASE_TEXTURE = preload("res://images/enemyBase.png")
+
+const ENEMY_BASE_STATS = {
+    "body_radius": 52.0,
+    "guard_count": 16,
+    "guard_orbit_radius": 115.0,
+    "guard_orbit_speed": 1.35,
+    "alert_radius": 250.0,
+    "patrol_radius": 85.0,
+    "patrol_speed": 10.0,
+}
+
 const DRONE_STATS = {
     DroneType.SHIELD: {
         "hp": 120.0,
@@ -152,6 +164,12 @@ static func GetMissileSpeed() -> float:
 
 static func GetEnemyDroneStats() -> Dictionary:
     return ENEMY_DRONE_STATS
+
+static func GetEnemyBaseStats() -> Dictionary:
+    return ENEMY_BASE_STATS
+
+static func GetEnemyBaseTexture():
+    return ENEMY_BASE_TEXTURE
 
 static func GetEnemyDroneTexture():
     return ENEMY_DRONE_TEXTURE
