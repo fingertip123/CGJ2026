@@ -20,6 +20,7 @@ onready var pSpeedLabel = $UiLayer/Panel/VBox/SpeedLabel
 onready var pSpeedSlider = $UiLayer/Panel/VBox/SpeedSlider
 onready var pBackground = $BackgroundLayer/Background
 onready var pAnchorIndicator = $UiLayer/AnchorIndicator
+onready var pMinimap = $UiLayer/Minimap
 
 const DroneEscortScene = preload("res://scenes/DroneEscort.tscn")
 const UnitData = preload("res://scripts/unit_data.gd")
@@ -63,6 +64,7 @@ func _ready() -> void:
     vParallaxOrigin = pShip.global_position
     pBackground.SetCameraOffset(Vector2.ZERO)
     pAnchorIndicator.Setup(pAnchorPoint, pShip)
+    pMinimap.Setup(pShip, pAnchorPoint, pPlanetsRoot, pRoute.oEditBounds)
     _SetupPlanets()
     pSpawnManager.Setup(self, pRoute, pShip)
     _RollCardPool()
