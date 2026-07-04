@@ -47,19 +47,16 @@ script = ExtResource( 4 )
 
 [node name="Planet" parent="Planets" instance=ExtResource( 7 )]
 position = Vector2( 480, 610 )
-nGravityRadius = 93.3333
-nGravityStrength = 360.0
+nGravityRadius = 130.0
 
 [node name="Planet2" parent="Planets" instance=ExtResource( 7 )]
 position = Vector2( 980, 300 )
-nGravityRadius = 106.667
-nGravityStrength = 390.0
+nGravityRadius = 150.0
 
 [node name="Planet3" parent="Planets" instance=ExtResource( 7 )]
 position = Vector2( 1260, 625 )
 nPlanetRadius = 11.3333
-nGravityRadius = 80.0
-nGravityStrength = 300.0
+nGravityRadius = 110.0
 
 [node name="Planet4" parent="Planets" instance=ExtResource( 7 )]
 position = Vector2( 1591, 8 )
