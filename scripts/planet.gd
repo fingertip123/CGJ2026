@@ -26,8 +26,10 @@ var bDepositsInitialized = false
 var pGravityRipples = null
 
 onready var pSprite = $Sprite
+onready var pCollisionShape = $StaticBody2D/CollisionShape2D
 
 func _ready() -> void:
+    _SyncCollisionShape()
     pGravityRipples = get_node_or_null("GravityRipples")
     _ApplySprite()
     if Engine.editor_hint and not bDepositsInitialized:
@@ -107,9 +109,22 @@ func SetGravityRadius(nValue: float) -> void:
 func SetPlanetRadius(nValue: float) -> void:
     nPlanetRadius = max(1.0, nValue)
     _ApplySprite()
+    _SyncCollisionShape()
     if pGravityRipples != null:
         pGravityRipples.SyncFromPlanet()
     update()
+
+func GetPlanetRadius() -> float:
+    return nPlanetRadius
+
+func _SyncCollisionShape() -> void:
+    if pCollisionShape == null:
+        return
+    var pShape = pCollisionShape.shape
+    if pShape == null or not (pShape is CircleShape2D):
+        pShape = CircleShape2D.new()
+        pCollisionShape.shape = pShape
+    pShape.radius = nPlanetRadius
 
 func SetHasDefenseTower(bValue: bool) -> void:
     bHasDefenseTower = bValue
