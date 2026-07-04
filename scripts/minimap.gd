@@ -76,6 +76,19 @@ func _WorldToMap(vWorld: Vector2) -> Vector2:
 func _WorldDistanceToMap(nWorldDistance: float) -> float:
     return nWorldDistance * _GetMapScale()
 
+func _ClampMapPoint(vPos: Vector2, nRadius: float = 0.0) -> Vector2:
+    var oMap = _GetMapRect()
+    var oInner = oMap.grow(-nRadius)
+    if oInner.size.x <= 0.0 or oInner.size.y <= 0.0:
+        return Vector2(
+            clamp(vPos.x, oMap.position.x, oMap.position.x + oMap.size.x),
+            clamp(vPos.y, oMap.position.y, oMap.position.y + oMap.size.y)
+        )
+    return Vector2(
+        clamp(vPos.x, oInner.position.x, oInner.position.x + oInner.size.x),
+        clamp(vPos.y, oInner.position.y, oInner.position.y + oInner.size.y)
+    )
+
 func _draw() -> void:
     draw_rect(Rect2(Vector2.ZERO, rect_size), Color(0.04, 0.06, 0.11, 0.92))
     draw_rect(Rect2(Vector2.ZERO, rect_size), Color(0.28, 0.38, 0.55, 0.75), false, 1.5)
@@ -88,7 +101,6 @@ func _draw() -> void:
     var vWorldRectEnd = _WorldToMap(oWorldBounds.position + oWorldBounds.size)
     draw_rect(Rect2(vWorldRectPos, vWorldRectEnd - vWorldRectPos), Color(0.12, 0.16, 0.24, 0.35), false, 1.0)
 
-    _DrawCameraView()
     _DrawPlanets()
     _DrawAnchor()
     _DrawShip()
@@ -96,25 +108,6 @@ func _draw() -> void:
     var oFont = get_font("font")
     if oFont != null:
         draw_string(oFont, Vector2(8, 14), "Map", Color(0.75, 0.82, 0.95, 0.9))
-
-func _DrawCameraView() -> void:
-    if pShip == null or not is_instance_valid(pShip):
-        return
-
-    var pCamera = pShip.get_node_or_null("Camera2D")
-    if pCamera == null or not pCamera.current:
-        return
-
-    var vViewportSize = get_viewport_rect().size
-    var vZoom = pCamera.zoom if pCamera.zoom.x > 0.001 else Vector2.ONE
-    var vHalfSize = Vector2(vViewportSize.x / vZoom.x, vViewportSize.y / vZoom.y) * 0.5
-    var vCenter = pShip.global_position
-    var oCameraRect = Rect2(vCenter - vHalfSize, vHalfSize * 2.0)
-
-    var vTopLeft = _WorldToMap(oCameraRect.position)
-    var vBottomRight = _WorldToMap(oCameraRect.position + oCameraRect.size)
-    draw_rect(Rect2(vTopLeft, vBottomRight - vTopLeft), Color(0.95, 0.9, 0.55, 0.18))
-    draw_rect(Rect2(vTopLeft, vBottomRight - vTopLeft), Color(0.95, 0.9, 0.55, 0.55), false, 1.0)
 
 func _DrawPlanets() -> void:
     if pPlanetsRoot == null or not is_instance_valid(pPlanetsRoot):
@@ -149,14 +142,17 @@ func _DrawShip() -> void:
     if pShip == null or not is_instance_valid(pShip):
         return
 
-    var vPos = _WorldToMap(pShip.global_position)
+    var nShipIconRadius = 8.0
+    var vPos = _ClampMapPoint(_WorldToMap(pShip.global_position), nShipIconRadius)
     var vVelocity = pShip.GetVelocity() if pShip.has_method("GetVelocity") else Vector2.ZERO
 
     if vVelocity.length_squared() > 4.0:
         var vDir = vVelocity.normalized()
-        var vTip = vPos + vDir * 7.0
+        var vTip = _ClampMapPoint(vPos + vDir * 7.0, 1.0)
         var vSide = Vector2(-vDir.y, vDir.x) * 4.0
-        draw_colored_polygon(PoolVector2Array([vTip, vPos - vDir * 2.0 + vSide, vPos - vDir * 2.0 - vSide]), Color(0.45, 0.85, 1.0, 0.95))
+        var vTailLeft = _ClampMapPoint(vPos - vDir * 2.0 + vSide, 1.0)
+        var vTailRight = _ClampMapPoint(vPos - vDir * 2.0 - vSide, 1.0)
+        draw_colored_polygon(PoolVector2Array([vTip, vTailLeft, vTailRight]), Color(0.45, 0.85, 1.0, 0.95))
     else:
         draw_circle(vPos, 4.0, Color(0.45, 0.85, 1.0, 0.95))
 
