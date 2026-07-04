@@ -46,6 +46,8 @@ position = Vector2( 1480, 120 )
 
 [node name="MissileRoot" type="Node2D" parent="."]
 
+[node name="GrappleRoot" type="Node2D" parent="."]
+
 [node name="SfxRoot" type="Node2D" parent="."]
 
 [node name="SpawnManager" type="Node2D" parent="."]

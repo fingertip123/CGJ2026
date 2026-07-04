@@ -2,6 +2,7 @@ tool
 extends KinematicBody2D
 
 const UnitData = preload("res://scripts/unit_data.gd")
+const GrappleVisual = preload("res://scripts/grapple_visual.gd")
 
 signal ReachedGoal
 signal Destroyed
@@ -24,6 +25,8 @@ export(float) var nDistancePerFuel = 13.0
 export(float) var nAnchorBrakeDecel = 100.0
 export(float) var nAnchorBrakeStopSpeed = 6.0
 export(float) var nShipCollisionRadius = 10.0
+export(float) var nTetherPullAccel = 420.0
+export(float) var nTetherDrag = 2.4
 
 var nLevel = 1
 var nMaxHp = 500.0
@@ -45,6 +48,10 @@ var vHeading = Vector2.RIGHT
 var vSpawnPosition = Vector2.ZERO
 var pRoute = null
 var pGame = null
+var bTethered = false
+var pTetherPlanet = null
+var vTetherLocalOffset = Vector2.ZERO
+var nTetherLength = 0.0
 
 func Setup(pRouteManager, pGameNode) -> void:
     pRoute = pRouteManager
@@ -60,6 +67,7 @@ func Setup(pRouteManager, pGameNode) -> void:
     nFlightTime = 0.0
     vVelocity = Vector2.ZERO
     vHeading = Vector2.RIGHT
+    ReleaseTether()
     _UpdateThruster()
     update()
 
@@ -85,6 +93,7 @@ func ResetPathProgress() -> void:
     vVelocity = Vector2.ZERO
     vHeading = Vector2.RIGHT
     global_position = vSpawnPosition
+    ReleaseTether()
     _UpdateThruster()
     update()
 
@@ -97,6 +106,7 @@ func ResetFlightState() -> void:
     nFlightTime = 0.0
     vVelocity = Vector2.ZERO
     vHeading = Vector2.RIGHT
+    ReleaseTether()
     _UpdateThruster()
     update()
 
@@ -211,6 +221,7 @@ func StopMarch() -> void:
     bBraking = false
     vVelocity = Vector2.ZERO
     vHeading = Vector2.RIGHT
+    ReleaseTether()
     _UpdateThruster()
 
 func StartAnchorBrake() -> void:
@@ -227,8 +238,32 @@ func _FinishAnchorBrake() -> void:
     bBraking = false
     vVelocity = Vector2.ZERO
     vHeading = Vector2.RIGHT
+    ReleaseTether()
     _UpdateThruster()
     emit_signal("AnchorBrakeFinished")
+
+func AttachTether(pPlanet, vLocalOffset: Vector2, vAnchorWorld: Vector2) -> void:
+    ReleaseTether()
+    pTetherPlanet = pPlanet
+    vTetherLocalOffset = vLocalOffset
+    bTethered = true
+    nTetherLength = global_position.distance_to(vAnchorWorld)
+    update()
+
+func ReleaseTether() -> void:
+    bTethered = false
+    pTetherPlanet = null
+    vTetherLocalOffset = Vector2.ZERO
+    nTetherLength = 0.0
+    update()
+
+func IsTethered() -> bool:
+    return bTethered and pTetherPlanet != null and is_instance_valid(pTetherPlanet)
+
+func GetTetherWorldPos() -> Vector2:
+    if not IsTethered():
+        return global_position
+    return pTetherPlanet.global_position + vTetherLocalOffset
 
 func IsInsideAnchorZone(vWorldPos: Vector2) -> bool:
     return global_position.distance_to(vWorldPos) <= nAnchorRadius
@@ -307,6 +342,49 @@ func _ResolvePlanetOverlaps() -> void:
         global_position = pPlanet.global_position + vFromPlanet * nMinDist
         vVelocity = vVelocity.slide(vFromPlanet)
 
+func _ApplyTetherPhysics(delta: float) -> void:
+    if not IsTethered():
+        return
+
+    var vAnchor = GetTetherWorldPos()
+    var vToAnchor = vAnchor - global_position
+    var nDist = vToAnchor.length()
+    if nDist <= 0.001:
+        return
+
+    var vDir = vToAnchor / nDist
+    if nDist > nTetherLength:
+        var nStretch = nDist - nTetherLength
+        vVelocity += vDir * min(nTetherPullAccel * delta, nStretch * 8.0)
+
+    var nAwaySpeed = vVelocity.dot(-vDir)
+    if nAwaySpeed > 0.0:
+        vVelocity += vDir * min(nAwaySpeed, 140.0 * delta)
+
+    vVelocity *= 1.0 / (1.0 + nTetherDrag * delta)
+
+func _DrawGrappleChain() -> void:
+    var vChainEnd = Vector2.ZERO
+    var vTowardShip = Vector2.ZERO
+    var bShowChain = false
+
+    if IsTethered():
+        vChainEnd = to_local(GetTetherWorldPos())
+        vTowardShip = -vChainEnd
+        bShowChain = vChainEnd.length_squared() > 1.0
+    elif pGame != null and pGame.has_method("GetGrappleChainEndLocal"):
+        var oChain = pGame.GetGrappleChainEndLocal(self)
+        if oChain.get("valid", false):
+            vChainEnd = oChain.pos
+            vTowardShip = oChain.dir
+            bShowChain = vChainEnd.length_squared() > 1.0
+
+    if not bShowChain:
+        return
+
+    GrappleVisual.DrawChain(self, Vector2.ZERO, vChainEnd)
+    GrappleVisual.DrawAnchorHead(self, vChainEnd, vTowardShip, 1.0)
+
 func _process(delta: float) -> void:
     if Engine.editor_hint:
         update()
@@ -316,6 +394,8 @@ func _process(delta: float) -> void:
         nFlightTime += delta
         if pRoute != null and pRoute.has_method("GetGravityAcceleration"):
             vVelocity += pRoute.GetGravityAcceleration(global_position) * delta
+        if IsTethered():
+            _ApplyTetherPhysics(delta)
         if bBraking:
             var nSpeed = vVelocity.length()
             if nSpeed <= nAnchorBrakeStopSpeed:
@@ -349,6 +429,8 @@ func _process(delta: float) -> void:
     update()
 
 func _draw() -> void:
+    _DrawGrappleChain()
+
     draw_circle(Vector2.ZERO, nAnchorRadius, Color(0.2, 0.75, 1.0, 0.08))
     draw_arc(Vector2.ZERO, nAnchorRadius, 0.0, TAU, 64, Color(0.35, 0.85, 1.0, 0.45), 2.0, true)
     draw_arc(Vector2.ZERO, nAnchorRadius * 0.65, 0.0, TAU, 48, Color(0.55, 0.8, 1.0, 0.08), 1.0, true)

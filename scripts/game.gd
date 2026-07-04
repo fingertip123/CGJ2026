@@ -26,6 +26,7 @@ onready var pTwinkleStars = $BackgroundLayer/TwinkleStars
 onready var pAnchorIndicator = $UiLayer/AnchorIndicator
 onready var pMinimap = $UiLayer/Minimap
 onready var pMissileRoot = $MissileRoot
+onready var pGrappleRoot = $GrappleRoot
 onready var pSfxRoot = $SfxRoot
 onready var pFlowUi = $FlowUi
 onready var pGamePanel = $UiLayer/Panel
@@ -33,6 +34,7 @@ onready var pGamePanel = $UiLayer/Panel
 const DroneEscortScene = preload("res://scenes/DroneEscort.tscn")
 const DroneMiningScene = preload("res://scenes/DroneMining.tscn")
 const MissileScene = preload("res://scenes/Missile.tscn")
+const GrappleAnchorScene = preload("res://scenes/GrappleAnchor.tscn")
 const UnitData = preload("res://scripts/unit_data.gd")
 
 export(int) var nStartGold = 60
@@ -59,6 +61,7 @@ var vEnemyMissileSfxPlayers = []
 var nEnemyMissileSfxIndex = 0
 var vShipPulseSfxPlayers = []
 var nShipPulseSfxIndex = 0
+var pActiveGrapple = null
 
 func _ready() -> void:
     nGold = nStartGold
@@ -634,7 +637,57 @@ func _OnRouteChanged() -> void:
         _SyncRouteStart()
     _UpdateUi()
 
+func CanFireGrapple() -> bool:
+    return nPhase == GamePhase.MARCH and pShip.bMoving
+
+func _ClearGrapple() -> void:
+    if pActiveGrapple != null and is_instance_valid(pActiveGrapple):
+        pActiveGrapple.queue_free()
+    pActiveGrapple = null
+    pShip.ReleaseTether()
+
+func _FireGrapple(vMouseWorld: Vector2) -> void:
+    if not CanFireGrapple():
+        return
+
+    _ClearGrapple()
+
+    var vDir = vMouseWorld - pShip.global_position
+    if vDir.length_squared() <= 64.0:
+        vDir = pShip.GetVelocity()
+    if vDir.length_squared() <= 1.0:
+        vDir = Vector2.RIGHT
+
+    var pGrapple = GrappleAnchorScene.instance()
+    pGrappleRoot.add_child(pGrapple)
+    pGrapple.connect("Attached", self, "_OnGrappleAttached")
+    pGrapple.connect("Missed", self, "_OnGrappleMissed")
+    pGrapple.global_position = pShip.global_position + vDir.normalized() * 18.0
+    pGrapple.Setup(vDir, pPlanetsRoot)
+    pActiveGrapple = pGrapple
+
+func _OnGrappleAttached(pPlanet, vLocalOffset, vWorldPos) -> void:
+    pShip.AttachTether(pPlanet, vLocalOffset, vWorldPos)
+
+func _OnGrappleMissed() -> void:
+    pActiveGrapple = null
+
+func GetGrappleChainEndLocal(pShip) -> Dictionary:
+    if pActiveGrapple == null or not is_instance_valid(pActiveGrapple):
+        return {"valid": false}
+    if pShip.IsTethered() or pActiveGrapple.IsAttached():
+        return {"valid": false}
+
+    var vLocal = pShip.to_local(pActiveGrapple.global_position)
+    var vTowardShip = -vLocal
+    if vTowardShip.length_squared() <= 0.001:
+        vTowardShip = Vector2.LEFT
+    else:
+        vTowardShip = vTowardShip.normalized()
+    return {"valid": true, "pos": vLocal, "dir": vTowardShip}
+
 func _BeginMarch() -> void:
+    _ClearGrapple()
     pRoute.ResetPreviewTrim()
     pRoute.SetEditingEnabled(false)
     _SyncRouteStart()
@@ -649,6 +702,7 @@ func _BeginMarch() -> void:
 func _DropAnchor() -> void:
     if not CanDropAnchor():
         return
+    _ClearGrapple()
     pShip.StartAnchorBrake()
     _UpdateUi()
 
@@ -697,8 +751,10 @@ func _UpdateUi() -> void:
                 pHintLabel.text = "Anchor deployed — braking to a stop."
             elif pShip.IsCoasting():
                 pHintLabel.text = "Out of fuel — coasting. Drop anchor to stop and mine."
+            elif pShip.IsTethered():
+                pHintLabel.text = "Grapple attached — tether slowing the ship."
             else:
-                pHintLabel.text = "Fuel draining. Drop anchor anytime to stop and replan."
+                pHintLabel.text = "Fuel draining. Right-click to grapple a planet. Drop anchor to stop."
         GamePhase.ANCHOR:
             pPhaseLabel.text = "ANCHORED"
             pPhaseLabel.add_color_override("font_color", oPhaseMuted)
@@ -765,6 +821,12 @@ func _UpdateActionButtons() -> void:
             pStartButton.text = "Launch"
 
 func _unhandled_input(event: InputEvent) -> void:
+    if event is InputEventMouseButton and event.pressed and event.button_index == BUTTON_RIGHT:
+        if CanFireGrapple():
+            _FireGrapple(get_global_mouse_position())
+            get_tree().set_input_as_handled()
+            return
+
     if event is InputEventKey and event.pressed and not event.echo:
         if event.scancode == KEY_R:
             _OnResetPressed()
