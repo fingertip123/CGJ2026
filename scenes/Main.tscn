@@ -37,6 +37,7 @@ position = Vector2( 140, 740 )
 
 [node name="AnchorPoint" parent="." instance=ExtResource( 8 )]
 position = Vector2( 1480, 120 )
+rotation = -1.32264
 
 [node name="DroneRoot" type="Node2D" parent="."]
 
