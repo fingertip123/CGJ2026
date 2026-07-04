@@ -15,9 +15,7 @@ script = ExtResource( 2 )
 [node name="BaseAnchor" type="Node2D" parent="."]
 script = ExtResource( 3 )
 
-[node name="DefenseRoot" type="Node2D" parent="."]
-
-[node name="SoldierRoot" type="Node2D" parent="."]
+[node name="DroneRoot" type="Node2D" parent="."]
 
 [node name="MonsterRoot" type="Node2D" parent="."]
 
@@ -29,54 +27,54 @@ script = ExtResource( 4 )
 [node name="Panel" type="Panel" parent="UiLayer"]
 margin_left = 12.0
 margin_top = 12.0
-margin_right = 500.0
+margin_right = 520.0
 margin_bottom = 200.0
 
 [node name="VBox" type="VBoxContainer" parent="UiLayer/Panel"]
 margin_left = 10.0
 margin_top = 8.0
-margin_right = 478.0
+margin_right = 498.0
 margin_bottom = 178.0
 
 [node name="TitleLabel" type="Label" parent="UiLayer/Panel/VBox"]
-margin_right = 468.0
+margin_right = 488.0
 margin_bottom = 14.0
-text = "Archor Tower - Anchor Defense"
+text = "Archor - Drone Escort Prototype"
 
 [node name="PhaseLabel" type="Label" parent="UiLayer/Panel/VBox"]
 margin_top = 18.0
-margin_right = 468.0
+margin_right = 488.0
 margin_bottom = 32.0
 text = "Phase: Prep"
 
 [node name="HintLabel" type="Label" parent="UiLayer/Panel/VBox"]
 margin_top = 36.0
-margin_right = 468.0
+margin_right = 488.0
 margin_bottom = 50.0
-text = "Buy units from card pool below."
+text = "Deploy escort drones from card pool below."
 autowrap = true
 
 [node name="StatsLabel" type="Label" parent="UiLayer/Panel/VBox"]
 margin_top = 54.0
-margin_right = 468.0
+margin_right = 488.0
 margin_bottom = 68.0
-text = "Base Lv.1 HP:500"
+text = "Ship Lv.1 HP:500"
 
 [node name="ResultLabel" type="Label" parent="UiLayer/Panel/VBox"]
 margin_top = 72.0
-margin_right = 468.0
+margin_right = 488.0
 margin_bottom = 86.0
 autowrap = true
 
 [node name="StartButton" type="Button" parent="UiLayer/Panel/VBox"]
 margin_top = 90.0
-margin_right = 468.0
+margin_right = 488.0
 margin_bottom = 110.0
-text = "Start March (Space)"
+text = "Launch (Space)"
 
 [node name="ResetButton" type="Button" parent="UiLayer/Panel/VBox"]
 margin_top = 114.0
-margin_right = 468.0
+margin_right = 488.0
 margin_bottom = 134.0
 text = "Reset (R)"
 
@@ -107,9 +105,9 @@ text = "Gold: 0"
 [node name="PoolLabel" type="Label" parent="UiLayer/CardPool"]
 margin_left = 16.0
 margin_top = 28.0
-margin_right = 260.0
+margin_right = 320.0
 margin_bottom = 44.0
-text = "Card Pool Lv.1"
+text = "Escort Drone Pool"
 
 [node name="CardHBox" type="HBoxContainer" parent="UiLayer/CardPool"]
 margin_left = 16.0
@@ -122,21 +120,21 @@ custom_constants/separation = 10
 margin_right = 120.0
 margin_bottom = 50.0
 rect_min_size = Vector2( 120, 50 )
-text = "Tank"
+text = "Drone"
 
 [node name="Card1" type="Button" parent="UiLayer/CardPool/CardHBox"]
 margin_left = 130.0
 margin_right = 250.0
 margin_bottom = 50.0
 rect_min_size = Vector2( 120, 50 )
-text = "Archer"
+text = "Drone"
 
 [node name="Card2" type="Button" parent="UiLayer/CardPool/CardHBox"]
 margin_left = 260.0
 margin_right = 380.0
 margin_bottom = 50.0
 rect_min_size = Vector2( 120, 50 )
-text = "Warrior"
+text = "Drone"
 
 [node name="Card3" type="Button" parent="UiLayer/CardPool/CardHBox"]
 margin_left = 390.0
@@ -164,4 +162,4 @@ margin_left = 740.0
 margin_top = 18.0
 margin_right = 900.0
 margin_bottom = 48.0
-text = "Upgrade Base"
+text = "Upgrade Ship"

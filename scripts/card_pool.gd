@@ -23,9 +23,9 @@ func _ready() -> void:
             var nIndex = vCardButtons.size() - 1
             pChild.connect("pressed", self, "_OnCardPressed", [nIndex])
 
-func UpdateDisplay(nGold: int, vCards: Array, nVisibleSlots: int, nRefreshCooldown: float, nRefreshCost: int, bCanRefresh: bool, nBaseLevel: int, nUpgradeCost: int, bCanUpgrade: bool, bHasTowerSlot: bool, nTowerSlots: int, nFilledTowerSlots: int) -> void:
+func UpdateDisplay(nGold: int, vCards: Array, nVisibleSlots: int, nRefreshCooldown: float, nRefreshCost: int, bCanRefresh: bool, nShipLevel: int, nUpgradeCost: int, bCanUpgrade: bool, nDroneCount: int, nDroneMax: int) -> void:
     pGoldLabel.text = "Gold: %d" % nGold
-    pPoolLabel.text = "Base Lv.%d  Cards:%d  Tower Slots:%d/%d" % [nBaseLevel, nVisibleSlots, nFilledTowerSlots, nTowerSlots]
+    pPoolLabel.text = "Ship Lv.%d  Drones: %d/%d  Cards: %d" % [nShipLevel, nDroneCount, nDroneMax, nVisibleSlots]
 
     for i in range(vCardButtons.size()):
         var pBtn = vCardButtons[i]
@@ -35,12 +35,9 @@ func UpdateDisplay(nGold: int, vCards: Array, nVisibleSlots: int, nRefreshCooldo
         pBtn.visible = true
         if i < vCards.size():
             var oCard = vCards[i]
-            var sName = UnitData.GetCardDisplayName(oCard)
-            var sPrefix = "Unit" if oCard.kind == UnitData.CardKind.SOLDIER else "Tower"
-            pBtn.text = "[%s]\n%s\n%d G" % [sPrefix, sName, oCard.cost]
-            var bCanBuy = nGold >= oCard.cost
-            if oCard.kind == UnitData.CardKind.TOWER and not bHasTowerSlot:
-                bCanBuy = false
+            var sName = UnitData.GetDroneName(oCard.type)
+            pBtn.text = "[Drone]\n%s\n%d G" % [sName, oCard.cost]
+            var bCanBuy = nGold >= oCard.cost and nDroneCount < nDroneMax
             pBtn.disabled = not bCanBuy
         else:
             pBtn.text = "-"
@@ -54,10 +51,10 @@ func UpdateDisplay(nGold: int, vCards: Array, nVisibleSlots: int, nRefreshCooldo
         pRefreshButton.disabled = not bCanRefresh
 
     if bCanUpgrade:
-        pUpgradeButton.text = "Upgrade Base (%d G)" % nUpgradeCost
+        pUpgradeButton.text = "Upgrade Ship (%d G)" % nUpgradeCost
         pUpgradeButton.disabled = nGold < nUpgradeCost
     else:
-        pUpgradeButton.text = "Base MAX"
+        pUpgradeButton.text = "Ship MAX"
         pUpgradeButton.disabled = true
 
 func _OnCardPressed(nIndex: int) -> void:

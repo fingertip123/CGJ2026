@@ -3,11 +3,10 @@ extends Node2D
 enum GamePhase { PREP, MARCH, WIN, LOSE }
 
 onready var pRoute = $RouteManager
-onready var pBase = $BaseAnchor
+onready var pShip = $BaseAnchor
 onready var pSpawnManager = $SpawnManager
-onready var pDefenseRoot = $DefenseRoot
+onready var pDroneRoot = $DroneRoot
 onready var pMonsterRoot = $MonsterRoot
-onready var pSoldierRoot = $SoldierRoot
 onready var pCardPool = $UiLayer/CardPool
 onready var pPhaseLabel = $UiLayer/Panel/VBox/PhaseLabel
 onready var pHintLabel = $UiLayer/Panel/VBox/HintLabel
@@ -16,11 +15,9 @@ onready var pResultLabel = $UiLayer/Panel/VBox/ResultLabel
 onready var pStartButton = $UiLayer/Panel/VBox/StartButton
 onready var pResetButton = $UiLayer/Panel/VBox/ResetButton
 
-const DefenseTowerScene = preload("res://scenes/DefenseTower.tscn")
-const SoldierScene = preload("res://scenes/Soldier.tscn")
+const DroneEscortScene = preload("res://scenes/DroneEscort.tscn")
 const UnitData = preload("res://scripts/unit_data.gd")
 
-export(int) var nMaxSoldiers = 8
 export(int) var nStartGold = 60
 export(int) var nKillGold = 15
 export(int) var nRefreshCost = 15
@@ -31,24 +28,21 @@ var nGold = 60
 var nMonstersKilled = 0
 var nRefreshCooldown = 0.0
 var vMonsters = []
-var vTowers = []
-var vSoldiers = []
+var vDrones = []
 var vCards = []
-var vTowerSlotOccupied = []
 
 func _ready() -> void:
     nGold = nStartGold
-    pBase.connect("ReachedGoal", self, "_OnBaseReachedGoal")
-    pBase.connect("Destroyed", self, "_OnBaseDestroyed")
-    pBase.connect("LevelChanged", self, "_OnBaseLevelChanged")
+    pShip.connect("ReachedGoal", self, "_OnShipReachedGoal")
+    pShip.connect("Destroyed", self, "_OnShipDestroyed")
+    pShip.connect("LevelChanged", self, "_OnShipLevelChanged")
     pStartButton.connect("pressed", self, "_OnStartPressed")
     pResetButton.connect("pressed", self, "_OnResetPressed")
     pCardPool.connect("CardPressed", self, "_OnCardPressed")
     pCardPool.connect("RefreshPressed", self, "_OnRefreshPressed")
     pCardPool.connect("UpgradePressed", self, "_OnUpgradePressed")
-    pBase.Setup(pRoute, self)
-    pSpawnManager.Setup(self, pRoute, pBase)
-    _InitTowerSlots()
+    pShip.Setup(pRoute, self)
+    pSpawnManager.Setup(self, pRoute, pShip)
     _RollCardPool()
     _SetPhase(GamePhase.PREP)
     _UpdateUi()
@@ -68,6 +62,9 @@ func _process(delta: float) -> void:
 
 func IsMarchRunning() -> bool:
     return nPhase == GamePhase.MARCH
+
+func GetDroneMaxCount() -> int:
+    return pShip.GetDroneMaxCount()
 
 func GetAliveMonsterCount() -> int:
     var nCount = 0
@@ -95,7 +92,7 @@ func GetNearestMonsterInAnchorZone(vFrom: Vector2, nZoneRadius: float):
     for pMonster in vMonsters:
         if pMonster == null or not is_instance_valid(pMonster) or not pMonster.bActive:
             continue
-        if pBase.global_position.distance_to(pMonster.global_position) > nDetectRadius:
+        if pShip.global_position.distance_to(pMonster.global_position) > nDetectRadius:
             continue
         var nDist = vFrom.distance_to(pMonster.global_position)
         if nDist < nBestDist:
@@ -106,18 +103,18 @@ func GetNearestMonsterInAnchorZone(vFrom: Vector2, nZoneRadius: float):
 func GetTargetForMonster(pMonster):
     var pBestTaunt = null
     var nBestDist = INF
-    for pSoldier in vSoldiers:
-        if pSoldier == null or not is_instance_valid(pSoldier) or not pSoldier.bActive:
+    for pDrone in vDrones:
+        if pDrone == null or not is_instance_valid(pDrone) or not pDrone.bActive:
             continue
-        if not pSoldier.bTaunt:
+        if not pDrone.bTaunt:
             continue
-        var nDist = pMonster.global_position.distance_to(pSoldier.global_position)
-        if nDist <= pSoldier.nTauntRange and nDist < nBestDist:
+        var nDist = pMonster.global_position.distance_to(pDrone.global_position)
+        if nDist <= pDrone.nTauntRange and nDist < nBestDist:
             nBestDist = nDist
-            pBestTaunt = pSoldier
+            pBestTaunt = pDrone
     if pBestTaunt != null:
         return pBestTaunt
-    return pBase
+    return pShip
 
 func AddMonster(pMonster, vPos: Vector2) -> void:
     pMonsterRoot.add_child(pMonster)
@@ -126,46 +123,17 @@ func AddMonster(pMonster, vPos: Vector2) -> void:
     pMonster.Setup(self)
     vMonsters.append(pMonster)
 
-func _InitTowerSlots() -> void:
-    var nCount = pBase.GetTowerSlotCount()
-    vTowerSlotOccupied.clear()
-    for i in range(nCount):
-        vTowerSlotOccupied.append(false)
-    pBase.SetSlotOccupied(vTowerSlotOccupied)
-
-func _GetEmptyTowerSlotIndex() -> int:
-    for i in range(pBase.GetTowerSlotCount()):
-        if i < vTowerSlotOccupied.size() and not vTowerSlotOccupied[i]:
-            return i
-    return -1
-
-func _GetFilledTowerSlotCount() -> int:
-    var nCount = 0
-    for bFilled in vTowerSlotOccupied:
-        if bFilled:
-            nCount += 1
-    return nCount
-
-func _HasEmptyTowerSlot() -> bool:
-    return _GetEmptyTowerSlotIndex() >= 0
-
 func _RollCardPool() -> void:
     vCards.clear()
-    var nSlots = pBase.GetCardSlotCount()
+    var nSlots = pShip.GetCardSlotCount()
     for i in range(nSlots):
-        vCards.append(UnitData.GenerateRandomCard())
+        vCards.append(UnitData.GenerateRandomDroneCard())
 
 func _GenerateSingleCard() -> Dictionary:
-    return UnitData.GenerateRandomCard()
+    return UnitData.GenerateRandomDroneCard()
 
 func _CanUseCard(oCard: Dictionary) -> bool:
-    if nGold < oCard.cost:
-        return false
-    if oCard.kind == UnitData.CardKind.SOLDIER:
-        return vSoldiers.size() < nMaxSoldiers
-    if oCard.kind == UnitData.CardKind.TOWER:
-        return _HasEmptyTowerSlot()
-    return false
+    return nGold >= oCard.cost and vDrones.size() < GetDroneMaxCount()
 
 func _TryUseCard(nIndex: int) -> void:
     if nPhase == GamePhase.WIN or nPhase == GamePhase.LOSE:
@@ -178,39 +146,18 @@ func _TryUseCard(nIndex: int) -> void:
         return
 
     nGold -= oCard.cost
-    if oCard.kind == UnitData.CardKind.SOLDIER:
-        _SpawnSoldier(oCard.type)
-    else:
-        _PlaceTowerFromCard(oCard.type)
-
+    _SpawnDrone(oCard.type)
     vCards[nIndex] = _GenerateSingleCard()
     _UpdateUi()
 
-func _SpawnSoldier(nType: int) -> void:
-    var vOffset = _GetRandomAnchorOffset()
-    var pSoldier = SoldierScene.instance()
-    pSoldierRoot.add_child(pSoldier)
-    pSoldier.connect("Died", self, "_OnSoldierDied")
-    pSoldier.Setup(self, pBase, nType, vOffset)
-    vSoldiers.append(pSoldier)
-
-func _PlaceTowerFromCard(nTowerType: int) -> void:
-    var nSlot = _GetEmptyTowerSlotIndex()
-    if nSlot < 0:
-        return
-
-    var vOffset = pBase.GetTowerSlotOffset(nSlot)
-    var pTower = DefenseTowerScene.instance()
-    pDefenseRoot.add_child(pTower)
-    pTower.Setup(self, pBase, nTowerType, vOffset, nSlot)
-    vTowers.append(pTower)
-    vTowerSlotOccupied[nSlot] = true
-    pBase.SetSlotOccupied(vTowerSlotOccupied)
-
-func _GetRandomAnchorOffset() -> Vector2:
-    var nRadius = pBase.nAnchorRadius * 0.75
-    var nAngle = randf() * TAU
-    return Vector2(cos(nAngle), sin(nAngle)) * rand_range(nRadius * 0.35, nRadius)
+func _SpawnDrone(nType: int) -> void:
+    var pDrone = DroneEscortScene.instance()
+    pDroneRoot.add_child(pDrone)
+    pDrone.connect("Died", self, "_OnDroneDied")
+    var nSlotIndex = vDrones.size()
+    var nSlotTotal = max(GetDroneMaxCount(), nSlotIndex + 1)
+    pDrone.Setup(self, pShip, nType, nSlotIndex, nSlotTotal)
+    vDrones.append(pDrone)
 
 func _OnMonsterDied(pMonster) -> void:
     nMonstersKilled += 1
@@ -220,32 +167,29 @@ func _OnMonsterDied(pMonster) -> void:
         pMonster.queue_free()
     _UpdateUi()
 
-func _OnSoldierDied(pSoldier) -> void:
-    vSoldiers.erase(pSoldier)
-    if is_instance_valid(pSoldier):
-        pSoldier.queue_free()
+func _OnDroneDied(pDrone) -> void:
+    vDrones.erase(pDrone)
+    if is_instance_valid(pDrone):
+        pDrone.queue_free()
     _UpdateUi()
 
-func _OnBaseReachedGoal() -> void:
-    pBase.StopMarch()
+func _OnShipReachedGoal() -> void:
+    pShip.StopMarch()
     _SetPhase(GamePhase.WIN)
-    pResultLabel.text = "Mission complete! Base reached the goal."
+    pResultLabel.text = "Anchor reached! Mission complete."
     pResultLabel.add_color_override("font_color", Color(0.45, 0.95, 0.55))
     _UpdateUi()
 
-func _OnBaseDestroyed() -> void:
-    pBase.StopMarch()
+func _OnShipDestroyed() -> void:
+    pShip.StopMarch()
     _SetPhase(GamePhase.LOSE)
-    pResultLabel.text = "Base destroyed. Recruit more units and upgrade."
+    pResultLabel.text = "Ship destroyed. Deploy more escort drones."
     pResultLabel.add_color_override("font_color", Color(0.95, 0.45, 0.45))
     _UpdateUi()
 
-func _OnBaseLevelChanged(nLevel: int) -> void:
-    while vTowerSlotOccupied.size() < pBase.GetTowerSlotCount():
-        vTowerSlotOccupied.append(false)
-    while vCards.size() < pBase.GetCardSlotCount():
+func _OnShipLevelChanged(nLevel: int) -> void:
+    while vCards.size() < pShip.GetCardSlotCount():
         vCards.append(_GenerateSingleCard())
-    pBase.SetSlotOccupied(vTowerSlotOccupied)
     _UpdateUi()
 
 func _OnStartPressed() -> void:
@@ -270,17 +214,17 @@ func _OnRefreshPressed() -> void:
     _UpdateUi()
 
 func _OnUpgradePressed() -> void:
-    if not pBase.CanUpgrade():
+    if not pShip.CanUpgrade():
         return
-    var nCost = pBase.GetUpgradeCost()
+    var nCost = pShip.GetUpgradeCost()
     if nGold < nCost:
         return
     nGold -= nCost
-    pBase.UpgradeLevel()
+    pShip.UpgradeLevel()
     _UpdateUi()
 
 func _BeginMarch() -> void:
-    pBase.StartMarch()
+    pShip.StartMarch()
     pSpawnManager.Reset()
     _SetPhase(GamePhase.MARCH)
     _UpdateUi()
@@ -294,10 +238,10 @@ func _UpdateUi() -> void:
     match nPhase:
         GamePhase.PREP:
             pPhaseLabel.text = "Phase: Prep"
-            pHintLabel.text = "Use cards to recruit. Towers fill fixed slots on base."
+            pHintLabel.text = "Deploy escort drones from card pool. They orbit the ship anchor zone."
         GamePhase.MARCH:
-            pPhaseLabel.text = "Phase: March"
-            pHintLabel.text = "Cards auto-refill. Earn gold from kills to refresh pool."
+            pPhaseLabel.text = "Phase: Flight"
+            pHintLabel.text = "Drones orbit and intercept threats within anchor range."
         GamePhase.WIN:
             pPhaseLabel.text = "Phase: Victory"
             pHintLabel.text = "Press Reset to play again."
@@ -305,25 +249,23 @@ func _UpdateUi() -> void:
             pPhaseLabel.text = "Phase: Defeat"
             pHintLabel.text = "Press Reset to try again."
 
-    pStatsLabel.text = "Base Lv.%d HP:%d  Gold:%d  Units:%d  Towers:%d/%d  Kills:%d" % [
-        pBase.nLevel, int(pBase.nHp), nGold, vSoldiers.size(),
-        _GetFilledTowerSlotCount(), pBase.GetTowerSlotCount(), nMonstersKilled
+    pStatsLabel.text = "Ship Lv.%d HP:%d  Gold:%d  Drones:%d/%d  Kills:%d" % [
+        pShip.nLevel, int(pShip.nHp), nGold, vDrones.size(), GetDroneMaxCount(), nMonstersKilled
     ]
 
     var bCanRefresh = nRefreshCooldown <= 0.0 and nGold >= nRefreshCost and nPhase != GamePhase.WIN and nPhase != GamePhase.LOSE
     pCardPool.UpdateDisplay(
         nGold,
         vCards,
-        pBase.GetCardSlotCount(),
+        pShip.GetCardSlotCount(),
         nRefreshCooldown,
         nRefreshCost,
         bCanRefresh,
-        pBase.nLevel,
-        pBase.GetUpgradeCost(),
-        pBase.CanUpgrade(),
-        _HasEmptyTowerSlot(),
-        pBase.GetTowerSlotCount(),
-        _GetFilledTowerSlotCount()
+        pShip.nLevel,
+        pShip.GetUpgradeCost(),
+        pShip.CanUpgrade(),
+        vDrones.size(),
+        GetDroneMaxCount()
     )
 
 func _unhandled_input(event: InputEvent) -> void:
