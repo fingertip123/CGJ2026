@@ -51,6 +51,12 @@ func Setup(pManager, pShipNode, nDroneType: int, nSlotIndex: int, nSlotTotal: in
     position = _GetOrbitPosition()
     update()
 
+func SyncFromShip() -> void:
+    if pShip == null or not is_instance_valid(pShip):
+        return
+    var oStats = UnitData.GetDroneStats(nType)
+    nOrbitRadius = pShip.nAnchorRadius * oStats.orbit_radius_ratio
+
 func _ApplySprite() -> void:
     if pSprite == null:
         return
@@ -84,7 +90,7 @@ func _process(delta: float) -> void:
         return
 
     if pGame.CanDroneAttack():
-        var pTarget = pGame.GetNearestMonsterInAnchorZone(global_position, pShip.nAnchorRadius)
+        var pTarget = pGame.GetNearestMonsterInAnchorZone(global_position, pShip.GetEscortDetectRadius())
         if pTarget != null:
             _SeekAndAttack(pTarget, delta)
         else:

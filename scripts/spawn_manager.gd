@@ -6,8 +6,8 @@ export(float) var nSpawnInterval = 1.6
 export(float) var nMinSpawnInterval = 0.35
 export(float) var nSpawnAccelDuration = 180.0
 export(float) var nSpawnAccelMinScale = 0.32
-export(float) var nEdgePadding = 32.0
-export(int) var nMaxAlive = 18
+export(float) var nEdgePadding = 64.0
+export(int) var nMaxAlive = 26
 
 var pGame = null
 var pRoute = null

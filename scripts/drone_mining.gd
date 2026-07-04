@@ -39,6 +39,12 @@ func Setup(pManager, pShipNode, nSlotIndex: int, nSlotTotal: int) -> void:
     position = _GetOrbitPosition()
     update()
 
+func SyncFromShip() -> void:
+    if pShip == null or not is_instance_valid(pShip):
+        return
+    var oStats = UnitData.GetMiningStats()
+    nOrbitRadius = pShip.nAnchorRadius * oStats.orbit_radius_ratio
+
 func _ApplySprite() -> void:
     if pSprite == null:
         return

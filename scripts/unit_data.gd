@@ -30,6 +30,7 @@ const MINING_TEXTURE = preload("res://images/miningDrone.png")
 const MINING_TEXTURE_SCALE = 0.011
 
 const PLANET_TEXTURE = preload("res://images/planet.png")
+const PLANET_SIZE_SCALE = 1.55
 
 const MISSILE_TEXTURE = preload("res://images/Bullet.png")
 const MISSILE_TEXTURE_SCALE = 0.010
@@ -56,15 +57,25 @@ const ENEMY_DRONE_STATS = {
     "move_speed": 85.0,
 }
 
+const ENEMY_BASE_GUARD_STATS = {
+    "hp": 72.0,
+    "damage": 12.0,
+    "interval": 0.65,
+    "move_speed": 95.0,
+}
+
 const ENEMY_BASE_TEXTURE = preload("res://images/enemyBase.png")
+
+const MAP_SCALE = 6.0
+const MAP_BASE_SIZE = Vector2(1600, 790)
 
 const ENEMY_BASE_STATS = {
     "body_radius": 52.0,
-    "guard_count": 16,
-    "guard_orbit_radius": 115.0,
+    "guard_count": 28,
+    "guard_orbit_radius": 165.0,
     "guard_orbit_speed": 1.35,
-    "alert_radius": 250.0,
-    "patrol_radius": 85.0,
+    "alert_radius": 520.0,
+    "patrol_radius": 110.0,
     "patrol_speed": 10.0,
 }
 
@@ -123,10 +134,10 @@ const MINING_STATS = {
 }
 
 const SHIP_LEVELS = [
-    {"card_slots": 2, "drone_max": 4, "mining_max": 2, "hp": 500.0, "attack": 8.0, "attack_range": 72.0, "radius": 120.0, "upgrade_cost": 80},
-    {"card_slots": 3, "drone_max": 6, "mining_max": 3, "hp": 650.0, "attack": 10.0, "attack_range": 78.0, "radius": 135.0, "upgrade_cost": 150},
-    {"card_slots": 4, "drone_max": 8, "mining_max": 4, "hp": 820.0, "attack": 12.0, "attack_range": 84.0, "radius": 150.0, "upgrade_cost": 250},
-    {"card_slots": 5, "drone_max": 10, "mining_max": 5, "hp": 1000.0, "attack": 15.0, "attack_range": 90.0, "radius": 165.0, "upgrade_cost": -1},
+    {"card_slots": 2, "drone_max": 4, "mining_max": 2, "hp": 500.0, "attack": 8.0, "attack_range": 72.0, "attack_interval": 0.55, "radius": 120.0, "escort_detect_radius": 145.0, "scale": 1.0, "upgrade_cost": 80},
+    {"card_slots": 3, "drone_max": 6, "mining_max": 3, "hp": 650.0, "attack": 11.0, "attack_range": 82.0, "attack_interval": 0.47, "radius": 138.0, "escort_detect_radius": 178.0, "scale": 1.1, "upgrade_cost": 150},
+    {"card_slots": 4, "drone_max": 8, "mining_max": 4, "hp": 820.0, "attack": 14.0, "attack_range": 92.0, "attack_interval": 0.40, "radius": 156.0, "escort_detect_radius": 215.0, "scale": 1.2, "upgrade_cost": 250},
+    {"card_slots": 5, "drone_max": 10, "mining_max": 5, "hp": 1000.0, "attack": 18.0, "attack_range": 102.0, "attack_interval": 0.34, "radius": 174.0, "escort_detect_radius": 255.0, "scale": 1.3, "upgrade_cost": -1},
 ]
 
 static func GetDroneStats(nType: int) -> Dictionary:
@@ -150,6 +161,9 @@ static func GetMiningTextureScale() -> float:
 static func GetPlanetTexture():
     return PLANET_TEXTURE
 
+static func GetPlanetSizeScale() -> float:
+    return PLANET_SIZE_SCALE
+
 static func GetMissileTexture():
     return MISSILE_TEXTURE
 
@@ -164,6 +178,9 @@ static func GetMissileSpeed() -> float:
 
 static func GetEnemyDroneStats() -> Dictionary:
     return ENEMY_DRONE_STATS
+
+static func GetEnemyBaseGuardStats() -> Dictionary:
+    return ENEMY_BASE_GUARD_STATS
 
 static func GetEnemyBaseStats() -> Dictionary:
     return ENEMY_BASE_STATS
@@ -229,6 +246,23 @@ static func GenerateRandomEscortCard() -> Dictionary:
 static func GenerateMiningCard() -> Dictionary:
     return {"kind": CardKind.MINING, "type": 0, "cost": MINING_STATS.cost}
 
+static func GenerateStartingCardPool(nSlots: int) -> Array:
+    var vCards = []
+    if nSlots <= 0:
+        return vCards
+    if nSlots == 1:
+        vCards.append(GenerateMiningCard())
+        return vCards
+    var nMiningSlot = randi() % 2
+    for i in range(nSlots):
+        if i == nMiningSlot:
+            vCards.append(GenerateMiningCard())
+        elif i < 2:
+            vCards.append(GenerateRandomEscortCard())
+        else:
+            vCards.append(GenerateRandomCard())
+    return vCards
+
 static func GenerateRandomDroneCard() -> Dictionary:
     return GenerateRandomEscortCard()
 
@@ -248,3 +282,30 @@ static func GetOrbitSlotAngle(nIndex: int, nTotal: int) -> float:
     if nTotal <= 0:
         return 0.0
     return TAU * float(nIndex) / float(nTotal)
+
+static func GetMapScale() -> float:
+    return MAP_SCALE
+
+static func GetMapBounds() -> Rect2:
+    return Rect2(Vector2.ZERO, MAP_BASE_SIZE * MAP_SCALE)
+
+static func GetMapStart() -> Vector2:
+    return Vector2(140, 740) * MAP_SCALE
+
+static func GetMapAnchor() -> Vector2:
+    return Vector2(1480, 120) * MAP_SCALE
+
+static func GetMapDefaultDirectionHandle() -> Vector2:
+    return Vector2(360, 650) * MAP_SCALE
+
+static func GetMapMaxRouteLength() -> float:
+    return 820.0 * MAP_SCALE
+
+static func GetMapPreviewBounds() -> Rect2:
+    return Rect2(-3600, -3600, 16800, 12600)
+
+static func GetMapPreviewMaxDistance() -> float:
+    return 36000.0
+
+static func GetLateEnemyBaseSpawnRatio() -> float:
+    return 0.42

@@ -24,6 +24,9 @@ export(float) var nFuelBurnRate = 5.5
 export(float) var nDistancePerFuel = 13.0
 export(float) var nAnchorBrakeDecel = 100.0
 export(float) var nAnchorBrakeStopSpeed = 6.0
+export(float) var nCoastDecel = 16.0
+export(float) var nCoastMinSpeed = 12.0
+export(float) var nBaseShipCollisionRadius = 10.0
 export(float) var nShipCollisionRadius = 10.0
 
 var nLevel = 1
@@ -31,6 +34,8 @@ var nMaxHp = 500.0
 var nHp = 500.0
 var nFuel = 22.0
 var nAnchorRadius = 120.0
+var nEscortDetectRadius = 145.0
+var nShipVisualScale = 1.0
 var nAttackDamage = 8.0
 var nAttackRange = 72.0
 var nAttackInterval = 0.55
@@ -38,6 +43,7 @@ var nPathT = 0.0
 var bMoving = false
 var bHasThrust = false
 var bBraking = false
+var bCoasting = false
 var bFuelDepletedNotified = false
 var nAttackCooldown = 0.0
 var nFlightTime = 0.0
@@ -61,6 +67,7 @@ func Setup(pRouteManager, pGameNode) -> void:
     bMoving = false
     bHasThrust = false
     bBraking = false
+    bCoasting = false
     bFuelDepletedNotified = false
     nFlightTime = 0.0
     vVelocity = Vector2.ZERO
@@ -86,6 +93,7 @@ func ResetPathProgress() -> void:
     bMoving = false
     bHasThrust = false
     bBraking = false
+    bCoasting = false
     bFuelDepletedNotified = false
     nFlightTime = 0.0
     vVelocity = Vector2.ZERO
@@ -100,6 +108,7 @@ func ResetFlightState() -> void:
     bMoving = false
     bHasThrust = false
     bBraking = false
+    bCoasting = false
     bFuelDepletedNotified = false
     nFlightTime = 0.0
     vVelocity = Vector2.ZERO
@@ -141,6 +150,12 @@ func GetDroneMaxCount() -> int:
 func GetMiningDroneMaxCount() -> int:
     return GetLevelConfig().mining_max
 
+func GetEscortDetectRadius() -> float:
+    return nEscortDetectRadius
+
+func GetShipVisualScale() -> float:
+    return nShipVisualScale
+
 func GetFuel() -> float:
     return nFuel
 
@@ -151,7 +166,7 @@ func GetFuelRatio() -> float:
     return clamp(nFuel / max(nMaxFuel, 0.001), 0.0, 1.0)
 
 func IsCoasting() -> bool:
-    return bMoving and not bHasThrust
+    return bCoasting
 
 func HasFuel() -> bool:
     return nFuel > 0.001
@@ -196,8 +211,20 @@ func _ApplyLevelStats(bKeepHpRatio: bool) -> void:
     nMaxHp = oCfg.hp
     nHp = nMaxHp * nRatio if bKeepHpRatio else nMaxHp
     nAnchorRadius = oCfg.radius
+    nEscortDetectRadius = oCfg.escort_detect_radius
+    nShipVisualScale = oCfg.scale
     nAttackDamage = oCfg.attack
     nAttackRange = oCfg.attack_range
+    nAttackInterval = oCfg.attack_interval
+    nShipCollisionRadius = nBaseShipCollisionRadius * nShipVisualScale
+    _ApplyShipVisual()
+    _SyncCollisionShape()
+
+func _ApplyShipVisual() -> void:
+    if pAircraft == null:
+        return
+    var nScale = UnitData.SHIP_TEXTURE_SCALE * nShipVisualScale
+    pAircraft.scale = Vector2(nScale, nScale)
 
 func StartMarch() -> void:
     if pRoute != null and pRoute.has_method("HasRoute") and not pRoute.HasRoute():
@@ -209,6 +236,7 @@ func StartMarch() -> void:
     vVelocity = pRoute.GetDirection() * nLaunchSpeed if pRoute != null and pRoute.has_method("GetDirection") else Vector2.RIGHT * nLaunchSpeed
     bMoving = true
     bHasThrust = true
+    bCoasting = false
     bFuelDepletedNotified = false
     _UpdateHeading()
     _UpdateThruster()
@@ -217,6 +245,7 @@ func StopMarch() -> void:
     bMoving = false
     bHasThrust = false
     bBraking = false
+    bCoasting = false
     vVelocity = Vector2.ZERO
     vHeading = Vector2.RIGHT
     ReleaseTether()
@@ -226,6 +255,7 @@ func StartAnchorBrake() -> void:
     if not bMoving:
         return
     bHasThrust = false
+    bCoasting = false
     bBraking = true
 
 func IsBraking() -> bool:
@@ -234,6 +264,7 @@ func IsBraking() -> bool:
 func _FinishAnchorBrake() -> void:
     bMoving = false
     bBraking = false
+    bCoasting = false
     vVelocity = Vector2.ZERO
     vHeading = Vector2.RIGHT
     _UpdateThruster()
@@ -293,6 +324,20 @@ func _FirePulseMissile(pTarget) -> void:
     var vSpawn = global_position + vDir * 32.0
     pGame.SpawnShipPulseMissile(vSpawn, vDir, nAttackDamage, pTarget)
     pGame.PlayShipPulseLaunchSound(global_position)
+
+func _BeginCoast() -> void:
+    bCoasting = true
+
+func _ProcessCoastDecel(delta: float) -> void:
+    var nSpeed = vVelocity.length()
+    if nSpeed <= 0.001:
+        vVelocity = vHeading * nCoastMinSpeed
+        return
+    if nSpeed <= nCoastMinSpeed:
+        vVelocity = vVelocity.normalized() * nCoastMinSpeed
+        return
+    var nDecel = min(nCoastDecel * delta, nSpeed - nCoastMinSpeed)
+    vVelocity -= vVelocity.normalized() * nDecel
 
 func _UpdateThruster() -> void:
     if pThrusterFlame == null:
@@ -385,6 +430,9 @@ func _process(delta: float) -> void:
                 if not bFuelDepletedNotified:
                     bFuelDepletedNotified = true
                     emit_signal("FuelDepleted")
+                _BeginCoast()
+        elif bCoasting:
+            _ProcessCoastDecel(delta)
         _MoveWithPlanetCollision(vVelocity * delta)
         _ResolvePlanetOverlaps()
         nPathT = clamp(nFlightTime / max(nMaxFlightTime, 0.001), 0.0, 1.0)

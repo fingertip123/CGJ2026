@@ -34,6 +34,8 @@ const DroneEscortScene = preload("res://scenes/DroneEscort.tscn")
 const DroneMiningScene = preload("res://scenes/DroneMining.tscn")
 const MissileScene = preload("res://scenes/Missile.tscn")
 const GrappleAnchorScene = preload("res://scenes/GrappleAnchor.tscn")
+const PlanetScene = preload("res://scenes/Planet.tscn")
+const EnemyBaseScene = preload("res://scenes/EnemyBase.tscn")
 const UnitData = preload("res://scripts/unit_data.gd")
 
 export(int) var nStartGold = 60
@@ -62,6 +64,7 @@ var nEnemyMissileSfxIndex = 0
 var vShipPulseSfxPlayers = []
 var nShipPulseSfxIndex = 0
 var pActiveGrapple = null
+var bLateEnemyBasesSpawned = false
 
 func _ready() -> void:
     nGold = nStartGold
@@ -77,6 +80,7 @@ func _ready() -> void:
     pCardPool.connect("RefreshPressed", self, "_OnRefreshPressed")
     pCardPool.connect("UpgradePressed", self, "_OnUpgradePressed")
     pRoute.connect("RouteChanged", self, "_OnRouteChanged")
+    _ApplyMapLayout()
     pShip.Setup(pRoute, self)
     pShip.SetCameraActive(false)
     pSpeedSlider.min_value = nMinLaunchSpeed
@@ -93,11 +97,11 @@ func _ready() -> void:
     _SetupMissileSfx()
     _SetupEnemyMissileSfx()
     _SetupShipPulseSfx()
-    _SetupPlanets()
+    _GeneratePlanets()
     _SetupEnemyBases()
     pSpawnManager.Setup(self, pRoute, pShip)
     _SyncRouteFuelRange()
-    _RollCardPool()
+    _RollCardPool(true)
     pFlowUi.connect("WelcomeFinished", self, "_OnWelcomeFinished")
     pFlowUi.connect("ResetRequested", self, "_OnResetPressed")
     _SetGameplayUiVisible(false)
@@ -129,6 +133,7 @@ func _process(delta: float) -> void:
         _UpdateUi()
 
     pFlowUi.UpdateDangerMusic(IsShipThreatenedByEnemyBase())
+    _TrySpawnLateEnemyBases()
 
 func IsMarchRunning() -> bool:
     return nPhase == GamePhase.MARCH or nPhase == GamePhase.ANCHOR
@@ -424,10 +429,115 @@ func _SetupShipPulseSfx() -> void:
             pPlayer.stream = pStream
         vShipPulseSfxPlayers.append(pPlayer)
 
-func _SetupPlanets() -> void:
-    for pPlanet in pPlanetsRoot.get_children():
-        if pPlanet != null and is_instance_valid(pPlanet) and pPlanet.has_method("Setup"):
-            pPlanet.Setup(self)
+func _ApplyMapLayout() -> void:
+    pRoute.oEditBounds = UnitData.GetMapBounds()
+    pRoute.vStart = UnitData.GetMapStart()
+    pRoute.vDirectionHandle = UnitData.GetMapDefaultDirectionHandle()
+    pRoute.nMaxRouteLengthAtFullFuel = UnitData.GetMapMaxRouteLength()
+    pRoute.oPreviewBounds = UnitData.GetMapPreviewBounds()
+    pRoute.nPreviewMaxDistance = UnitData.GetMapPreviewMaxDistance()
+    pShip.global_position = UnitData.GetMapStart()
+    pAnchorPoint.global_position = UnitData.GetMapAnchor()
+    nGrappleMaxChainLength *= UnitData.GetMapScale() * 0.55
+    pShip.nMaxFlightTime *= UnitData.GetMapScale() * 0.85
+
+func _GeneratePlanets() -> void:
+    for pChild in pPlanetsRoot.get_children():
+        if pChild != null and is_instance_valid(pChild):
+            pChild.queue_free()
+
+    var oBounds = UnitData.GetMapBounds()
+    var vStart = UnitData.GetMapStart()
+    var vAnchor = UnitData.GetMapAnchor()
+    var nScale = UnitData.GetMapScale()
+    var vLayouts = [
+        {"pos": Vector2(480, 610) * nScale, "collision": 42.0, "gravity": 130.0},
+        {"pos": Vector2(980, 300) * nScale, "collision": 42.0, "gravity": 150.0},
+        {"pos": Vector2(1260, 625) * nScale, "collision": 34.0, "gravity": 110.0, "planet_radius": 34.0},
+        {"pos": Vector2(620, 180) * nScale, "collision": 40.0, "gravity": 135.0},
+        {"pos": Vector2(420, 420) * nScale, "collision": 36.0, "gravity": 120.0},
+        {"pos": Vector2(820, 520) * nScale, "collision": 38.0, "gravity": 128.0},
+        {"pos": Vector2(1120, 680) * nScale, "collision": 44.0, "gravity": 145.0},
+        {"pos": Vector2(300, 680) * nScale, "collision": 35.0, "gravity": 118.0},
+        {"pos": Vector2(1450, 420) * nScale, "collision": 42.0, "gravity": 140.0},
+        {"pos": Vector2(520, 120) * nScale, "collision": 36.0, "gravity": 125.0},
+    ]
+    var vPlaced = []
+    for oLayout in vLayouts:
+        _AddPlanetFromLayout(oLayout, vPlaced)
+
+    var nTargetCount = 24
+    var nMinDist = 360.0
+    var nStartClear = 480.0
+    var nAnchorClear = 980.0
+    var nAttempts = 0
+    while vPlaced.size() < nTargetCount and nAttempts < 800:
+        nAttempts += 1
+        var vPos = Vector2(
+            rand_range(oBounds.position.x + 160.0, oBounds.position.x + oBounds.size.x - 160.0),
+            rand_range(oBounds.position.y + 160.0, oBounds.position.y + oBounds.size.y - 160.0)
+        )
+        if vPos.distance_to(vStart) < nStartClear:
+            continue
+        if vPos.distance_to(vAnchor) < nAnchorClear:
+            continue
+        if not _IsPlanetSpotValid(vPos, vPlaced, nMinDist):
+            continue
+        var oRandomLayout = {
+            "pos": vPos,
+            "collision": rand_range(32.0, 46.0),
+            "gravity": rand_range(110.0, 155.0),
+        }
+        _AddPlanetFromLayout(oRandomLayout, vPlaced)
+
+func _IsPlanetSpotValid(vPos: Vector2, vPlaced: Array, nMinDist: float) -> bool:
+    for vOther in vPlaced:
+        if vPos.distance_to(vOther) < nMinDist:
+            return false
+    return true
+
+func _AddPlanetFromLayout(oLayout: Dictionary, vPlaced: Array) -> void:
+    var nSizeScale = UnitData.GetPlanetSizeScale()
+    var pPlanet = PlanetScene.instance()
+    pPlanetsRoot.add_child(pPlanet)
+    pPlanet.global_position = oLayout.pos
+    pPlanet.nCollisionRadius = oLayout.collision * nSizeScale
+    pPlanet.nGravityRadius = oLayout.gravity * nSizeScale
+    if oLayout.has("planet_radius"):
+        pPlanet.nPlanetRadius = oLayout.planet_radius * nSizeScale
+    else:
+        pPlanet.nPlanetRadius = oLayout.collision * nSizeScale
+    pPlanet.Setup(self)
+    vPlaced.append(oLayout.pos)
+
+func _TrySpawnLateEnemyBases() -> void:
+    if bLateEnemyBasesSpawned:
+        return
+    if nPhase != GamePhase.MARCH or not IsShipAlive():
+        return
+    var vAnchor = pAnchorPoint.global_position
+    var nTotalDist = UnitData.GetMapStart().distance_to(vAnchor)
+    var nDistToAnchor = pShip.global_position.distance_to(vAnchor)
+    if nDistToAnchor > nTotalDist * UnitData.GetLateEnemyBaseSpawnRatio():
+        return
+    bLateEnemyBasesSpawned = true
+    _SpawnLateEnemyBases()
+
+func _SpawnLateEnemyBases() -> void:
+    var vAnchor = pAnchorPoint.global_position
+    var nScale = UnitData.GetMapScale()
+    var vOffsets = [
+        Vector2(-920, 520),
+        Vector2(-560, -780),
+        Vector2(680, 420),
+    ]
+    for vOffset in vOffsets:
+        var pBase = EnemyBaseScene.instance()
+        pEnemyBasesRoot.add_child(pBase)
+        pBase.global_position = vAnchor + vOffset * (nScale / 6.0)
+        pBase.connect("Died", self, "_OnEnemyBaseDied")
+        pBase.Setup(self)
+        vEnemyBases.append(pBase)
 
 func _SetupEnemyBases() -> void:
     vEnemyBases.clear()
@@ -446,9 +556,12 @@ func _SyncRouteFuelRange() -> void:
 func _SyncRouteStart() -> void:
     pRoute.SyncStartFromShip(pShip.global_position)
 
-func _RollCardPool() -> void:
+func _RollCardPool(bStartingPool: bool = false) -> void:
     vCards.clear()
     var nSlots = pShip.GetCardSlotCount()
+    if bStartingPool:
+        vCards = UnitData.GenerateStartingCardPool(nSlots)
+        return
     for i in range(nSlots):
         vCards.append(UnitData.GenerateRandomCard())
 
@@ -580,6 +693,12 @@ func _OnShipFuelDepleted() -> void:
 func _OnShipLevelChanged(nLevel: int) -> void:
     while vCards.size() < pShip.GetCardSlotCount():
         vCards.append(_GenerateSingleCard())
+    for pDrone in vDrones:
+        if pDrone != null and is_instance_valid(pDrone) and pDrone.has_method("SyncFromShip"):
+            pDrone.SyncFromShip()
+    for pDrone in vMiningDrones:
+        if pDrone != null and is_instance_valid(pDrone) and pDrone.has_method("SyncFromShip"):
+            pDrone.SyncFromShip()
     for pBase in vEnemyBases:
         if pBase != null and is_instance_valid(pBase) and pBase.has_method("SyncHpFromShip"):
             pBase.SyncHpFromShip()
@@ -756,7 +875,7 @@ func _UpdateUi() -> void:
             if pShip.IsBraking():
                 pHintLabel.text = "Anchor deployed — braking to a stop."
             elif pShip.IsCoasting():
-                pHintLabel.text = "Out of fuel — coasting. Right-click a planet to anchor."
+                pHintLabel.text = "Out of fuel — drifting slowly. Right-click a planet to anchor."
             elif pShip.IsTethered() or pShip.IsBraking():
                 pHintLabel.text = "Anchor hooked — braking to a stop."
             else:
