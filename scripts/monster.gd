@@ -50,6 +50,8 @@ func TakeDamage(nAmount: float) -> void:
 func _process(delta: float) -> void:
     if not bActive or pGame == null:
         return
+    if not pGame.IsShipAlive() or not pGame.CanDroneAttack():
+        return
 
     var pTarget = pGame.GetTargetForMonster(self)
     if pTarget == null or not is_instance_valid(pTarget):

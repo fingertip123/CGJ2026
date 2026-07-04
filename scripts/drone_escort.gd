@@ -73,7 +73,8 @@ func GetHpRatio() -> float:
 func _process(delta: float) -> void:
     if not bActive or pShip == null or not is_instance_valid(pShip):
         return
-    if pGame == null:
+    if pGame == null or not pGame.IsShipAlive():
+        update()
         return
 
     nOrbitAngle += nOrbitSpeed * delta
