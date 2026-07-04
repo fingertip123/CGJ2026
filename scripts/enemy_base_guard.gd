@@ -29,7 +29,7 @@ func Setup(pGameNode, pBaseNode, nSlotIndex: int, nSlotTotal: int) -> void:
     pBase = pBaseNode
     nOrbitSlotOffset = UnitData.GetOrbitSlotAngle(nSlotIndex, nSlotTotal)
 
-    var oStats = UnitData.GetEnemyDroneStats()
+    var oStats = UnitData.GetEnemyBaseGuardStats()
     var oBaseStats = UnitData.GetEnemyBaseStats()
     nMaxHp = oStats.hp
     nHp = nMaxHp

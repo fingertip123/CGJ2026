@@ -2,16 +2,16 @@ extends Node2D
 
 signal RouteChanged
 
-export(Vector2) var vStart = Vector2(140, 740)
-export(Vector2) var vDirectionHandle = Vector2(360, 650)
-export(float) var nMaxRouteLengthAtFullFuel = 820.0
+export(Vector2) var vStart = Vector2(840, 4440)
+export(Vector2) var vDirectionHandle = Vector2(2160, 3900)
+export(float) var nMaxRouteLengthAtFullFuel = 4920.0
 export(float) var nPreviewFuelBurnRate = 5.5
 export(int) var nGravityPreviewSteps = 360
 export(float) var nGravityPreviewDelta = 0.05
 export(float) var nPreviewLaunchSpeed = 140.0
-export(Rect2) var oEditBounds = Rect2(Vector2.ZERO, Vector2(1600, 790))
-export(Rect2) var oPreviewBounds = Rect2(-600, -600, 2800, 2100)
-export(float) var nPreviewMaxDistance = 6000.0
+export(Rect2) var oEditBounds = Rect2(Vector2.ZERO, Vector2(9600, 4740))
+export(Rect2) var oPreviewBounds = Rect2(-3600, -3600, 16800, 12600)
+export(float) var nPreviewMaxDistance = 36000.0
 export(float) var nHandleRadius = 12.0
 export(float) var nMinDirectionLength = 32.0
 
