@@ -19,6 +19,7 @@ onready var pResetButton = $UiLayer/Panel/VBox/ResetButton
 onready var pSpeedLabel = $UiLayer/Panel/VBox/SpeedLabel
 onready var pSpeedSlider = $UiLayer/Panel/VBox/SpeedSlider
 onready var pBackground = $BackgroundLayer/Background
+onready var pAnchorIndicator = $UiLayer/AnchorIndicator
 
 const DroneEscortScene = preload("res://scenes/DroneEscort.tscn")
 const UnitData = preload("res://scripts/unit_data.gd")
@@ -61,6 +62,7 @@ func _ready() -> void:
     pRoute.SetPreviewLaunchSpeed(pShip.nLaunchSpeed)
     vParallaxOrigin = pShip.global_position
     pBackground.SetCameraOffset(Vector2.ZERO)
+    pAnchorIndicator.Setup(pAnchorPoint, pShip)
     _SetupPlanets()
     pSpawnManager.Setup(self, pRoute, pShip)
     _RollCardPool()
@@ -203,6 +205,7 @@ func _OnDroneDied(pDrone) -> void:
 
 func _OnShipReachedGoal() -> void:
     pShip.StopMarch()
+    pAnchorIndicator.SetIndicatorVisible(false)
     _SetPhase(GamePhase.WIN)
     pResultLabel.text = "Anchor reached! Mission complete."
     pResultLabel.add_color_override("font_color", Color(0.45, 0.95, 0.55))
