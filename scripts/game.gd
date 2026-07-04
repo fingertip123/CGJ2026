@@ -47,13 +47,6 @@ func _ready() -> void:
     _SetPhase(GamePhase.PREP)
     _UpdateUi()
 
-func _draw() -> void:
-    draw_rect(Rect2(Vector2.ZERO, Vector2(1024, 490)), Color(0.07, 0.09, 0.12))
-    for x in range(0, 1025, 64):
-        draw_line(Vector2(x, 0), Vector2(x, 490), Color(0.16, 0.2, 0.28, 0.35), 1.0)
-    for y in range(0, 491, 64):
-        draw_line(Vector2(0, y), Vector2(1024, y), Color(0.16, 0.2, 0.28, 0.35), 1.0)
-
 func _process(delta: float) -> void:
     if nRefreshCooldown > 0.0:
         nRefreshCooldown = max(0.0, nRefreshCooldown - delta)
